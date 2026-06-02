@@ -1,4 +1,4 @@
-# Basalam RAG
+# RAG Demo
 
 A local Retrieval-Augmented Generation (RAG) demo for asking questions over your own files and documents. The project uses FastAPI for the backend, Streamlit for the chat UI, ChromaDB as the vector database, and Sentence Transformers for embeddings.
 
@@ -43,8 +43,8 @@ A local Retrieval-Augmented Generation (RAG) demo for asking questions over your
 Clone the repository and enter the project directory:
 
 ```powershell
-git clone https://github.com/Ehsan24Elyasi/basalam-rag.git
-cd basalam-rag
+git clone https://github.com/Ehsan24Elyasi/RAG.git
+cd RAG
 ```
 
 Create and activate a virtual environment:
