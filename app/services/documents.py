@@ -50,6 +50,14 @@ class DocumentService:
         self.embeddings = embeddings
         self.vectors = vectors
 
+    @property
+    def index_fingerprint(self) -> str:
+        """Version all settings that change indexed vectors or chunk boundaries."""
+        return (
+            f"{self.embeddings.fingerprint}:chunker-paragraph-sentence-v2:"
+            f"size={self.settings.chunk_size}:overlap={self.settings.chunk_overlap}"
+        )
+
     def ingest_upload(self, filename: str, content: bytes) -> IngestedDocument:
         source_name = Path(filename or "upload").name
         if source_name in {"", ".", ".."}:
@@ -93,7 +101,7 @@ class DocumentService:
         if (
             existing
             and existing.content_hash == content_hash
-            and existing.embedding_fingerprint == self.embeddings.fingerprint
+            and existing.embedding_fingerprint == self.index_fingerprint
         ):
             return IngestedDocument(
                 existing.id, source_name, source_type, source_url, existing.chunk_count, True
@@ -104,7 +112,7 @@ class DocumentService:
             raise ValueError("The document contains no indexable text.")
 
         document_id = self.metadata.stable_document_id(source_key)
-        fingerprint_hash = sha256(self.embeddings.fingerprint.encode("utf-8")).hexdigest()[:12]
+        fingerprint_hash = sha256(self.index_fingerprint.encode("utf-8")).hexdigest()[:12]
         vector_ids = [
             f"{document_id}:{fingerprint_hash}:{content_hash}:{index}" for index in range(len(chunks))
         ]
@@ -120,7 +128,7 @@ class DocumentService:
             {
                 "document_id": document_id,
                 "content_hash": content_hash,
-                "embedding_fingerprint": self.embeddings.fingerprint,
+                "embedding_fingerprint": self.index_fingerprint,
                 "source_name": source_name,
                 "source_type": source_type,
                 "source_url": source_url or "",
@@ -139,7 +147,7 @@ class DocumentService:
                     source_type=source_type,
                     source_url=source_url,
                     content_hash=content_hash,
-                    embedding_fingerprint=self.embeddings.fingerprint,
+                    embedding_fingerprint=self.index_fingerprint,
                     chunk_count=len(chunks),
                     updated_at=datetime.now(timezone.utc),
                 ),

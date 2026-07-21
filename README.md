@@ -172,10 +172,12 @@ Open `.env` and configure it:
 ```env
 # Application
 APP_ENV=development
+ASSISTANT_NAME=Support Assistant
+COMPANY_NAME=Your Company
 DATA_DIR=app/data/runtime
 SQLITE_PATH=app/data/runtime/rag.sqlite3
 CHROMA_PERSIST_DIR=app/data/runtime/chroma
-CHROMA_COLLECTION_NAME=customer_support_multilingual_minilm_v1
+CHROMA_COLLECTION_NAME=customer_support_multilingual_minilm_normalized_paragraph_v2
 
 # GapGPT chat provider
 CHAT_PROVIDER=gapgpt
@@ -190,6 +192,7 @@ EMBEDDING_BATCH_SIZE=64
 
 # Retrieval and chunking
 TOP_K=4
+RETRIEVAL_MAX_DISTANCE=0.65
 CHUNK_SIZE=900
 CHUNK_OVERLAP=150
 MAX_HISTORY_MESSAGES=12
@@ -222,6 +225,15 @@ ADMIN_API_KEY=replace-this-with-a-long-random-secret
 ```
 
 `CHAT_API_KEY` is sent only by the backend to GapGPT.
+
+`ASSISTANT_NAME` and `COMPANY_NAME` control the public chat branding and the assistant identity used in responses. For example:
+
+```env
+ASSISTANT_NAME=Jibi Assistant
+COMPANY_NAME=Jibi
+```
+
+`RETRIEVAL_MAX_DISTANCE` controls the maximum accepted cosine distance for retrieved chunks. Lower values are stricter. The default `0.65` is a starting point and should be evaluated against your own documentation.
 
 `ADMIN_API_KEY` is the password used to unlock the admin dashboard. For example:
 
@@ -589,7 +601,7 @@ Vectors produced by different embedding models must never be mixed, even when th
 The current default collection is:
 
 ```env
-CHROMA_COLLECTION_NAME=customer_support_multilingual_minilm_v1
+CHROMA_COLLECTION_NAME=customer_support_multilingual_minilm_normalized_paragraph_v2
 ```
 
 If you change `EMBEDDING_MODEL`:
@@ -839,7 +851,7 @@ The selected Chroma collection contains vectors from another embedding model.
 Use a new collection name:
 
 ```env
-CHROMA_COLLECTION_NAME=customer_support_multilingual_minilm_v2
+CHROMA_COLLECTION_NAME=customer_support_multilingual_minilm_normalized_paragraph_v3
 ```
 
 Then restart and re-ingest all documents.

@@ -27,6 +27,7 @@ from app.schemas import (
     HealthResponse,
     IngestionRunResponse,
     IngestResponse,
+    PublicConfigResponse,
 )
 from app.services.chat import ChatService
 from app.services.crawler import CrawlError, WebCrawler
@@ -94,7 +95,13 @@ def create_app(
             settings=configured,
             metadata=metadata,
             documents=documents,
-            chat=ChatService(metadata=metadata, embeddings=embeddings, vectors=vectors, chat=chat_client),
+            chat=ChatService(
+                metadata=metadata,
+                embeddings=embeddings,
+                vectors=vectors,
+                chat=chat_client,
+                settings=configured,
+            ),
             crawler=crawler
             or WebCrawler(
                 timeout_seconds=configured.crawl_timeout_seconds,
@@ -138,6 +145,13 @@ def create_app(
     @api.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:
         return HealthResponse(status="ok")
+
+    @api.get("/api/config", response_model=PublicConfigResponse)
+    def public_config() -> PublicConfigResponse:
+        return PublicConfigResponse(
+            assistant_name=configured.assistant_name,
+            company_name=configured.company_name,
+        )
 
     @api.post("/api/chat", response_model=ChatResponse)
     def chat(request_body: ChatRequest, active: Runtime = Depends(runtime)) -> ChatResponse:

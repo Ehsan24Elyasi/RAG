@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Customer Support RAG"
+    assistant_name: str = Field(
+        default="پاسخ‌یار", validation_alias="ASSISTANT_NAME", min_length=1, max_length=100
+    )
+    company_name: str = Field(default="باسلام", validation_alias="COMPANY_NAME", min_length=1, max_length=100)
     environment: Literal["development", "test", "production"] = Field(
         default="development", validation_alias=AliasChoices("APP_ENV", "ENVIRONMENT")
     )
@@ -32,7 +36,7 @@ class Settings(BaseSettings):
         default=Path("app/data/runtime/chroma"), validation_alias="CHROMA_PERSIST_DIR"
     )
     chroma_collection_name: str = Field(
-        default="customer_support_multilingual_minilm_v1",
+        default="customer_support_multilingual_minilm_normalized_paragraph_v2",
         validation_alias="CHROMA_COLLECTION_NAME",
         min_length=1,
     )
@@ -64,6 +68,7 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = False
 
     top_k: int = Field(default=4, validation_alias="TOP_K", ge=1, le=20)
+    retrieval_max_distance: float = Field(default=0.65, validation_alias="RETRIEVAL_MAX_DISTANCE", ge=0, le=2)
     chunk_size: int = Field(default=900, validation_alias="CHUNK_SIZE", ge=100, le=4000)
     chunk_overlap: int = Field(default=150, validation_alias="CHUNK_OVERLAP", ge=0, le=1000)
     max_upload_bytes: int = Field(
@@ -138,7 +143,6 @@ class Settings(BaseSettings):
             value = [item.strip() for item in value.split(",") if item.strip()]
         if not isinstance(value, list):
             raise ValueError("must be a comma-separated string or a list")
-
         origins: list[str] = []
         for item in value:
             parsed = urlsplit(str(item))

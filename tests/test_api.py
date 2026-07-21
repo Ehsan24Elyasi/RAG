@@ -22,6 +22,16 @@ def test_static_pages_and_health(test_settings):
         assert client.get("/admin").status_code == 200
 
 
+def test_public_config_exposes_only_branding(test_settings):
+    with create_client(test_settings) as client:
+        response = client.get("/api/config")
+        assert response.status_code == 200
+        assert response.json() == {
+            "assistant_name": test_settings.assistant_name,
+            "company_name": test_settings.company_name,
+        }
+
+
 def test_admin_requires_bearer_key(test_settings):
     with create_client(test_settings) as client:
         assert client.get("/api/admin/status").status_code == 401

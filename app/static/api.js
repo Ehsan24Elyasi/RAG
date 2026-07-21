@@ -45,6 +45,8 @@ export const chatApi = (message, history, signal) => requestJson("/api/chat", {
   signal,
 });
 
+export const configApi = (signal) => requestJson("/api/config", { signal });
+
 export const adminApi = {
   status: (token) => requestJson("/api/admin/status", { token }),
   documents: (token) => requestJson("/api/admin/documents", { token }),

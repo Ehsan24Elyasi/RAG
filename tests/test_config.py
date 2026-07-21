@@ -48,4 +48,5 @@ def test_local_multilingual_embedding_defaults():
 
     assert settings.embedding_provider == "sentence-transformers"
     assert settings.embedding_model == ("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-    assert settings.chroma_collection_name == "customer_support_multilingual_minilm_v1"
+    assert settings.chroma_collection_name == "customer_support_multilingual_minilm_normalized_paragraph_v2"
+    assert settings.retrieval_max_distance == 0.65

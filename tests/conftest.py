@@ -10,13 +10,22 @@ from app.config import Settings
 class FakeEmbeddingProvider:
     fingerprint = "test:embedding-v1"
 
+    def __init__(self):
+        self.calls: list[list[str]] = []
+
     def embed(self, texts: list[str]) -> list[list[float]]:
+        self.calls.append(texts)
         return [[float(len(text)), 1.0] for text in texts]
 
 
 class FakeChatProvider:
-    def generate(self, prompt: str) -> str:
-        return "پاسخ آزمایشی [S1]"
+    def __init__(self, response: str = "پاسخ آزمایشی [S1]"):
+        self.response = response
+        self.messages: list[list[dict[str, str]]] = []
+
+    def generate(self, messages: list[dict[str, str]]) -> str:
+        self.messages.append(messages)
+        return self.response
 
 
 class FakeVectorStore:
@@ -59,4 +68,5 @@ def test_settings(tmp_path: Path) -> Settings:
         CHUNK_SIZE=100,
         CHUNK_OVERLAP=10,
         MAX_HISTORY_MESSAGES=4,
+        RETRIEVAL_MAX_DISTANCE=0.65,
     )

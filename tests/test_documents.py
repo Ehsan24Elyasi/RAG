@@ -47,7 +47,7 @@ def test_embedding_fingerprint_controls_idempotency(test_settings):
     assert repeated.unchanged is True
     stored = metadata.document_for_source("upload:faq.txt")
     assert stored is not None
-    assert stored.embedding_fingerprint == first_embeddings.fingerprint
+    assert stored.embedding_fingerprint == service.index_fingerprint
 
     class NewEmbeddingProvider(FakeEmbeddingProvider):
         fingerprint = "test:embedding-v2"
@@ -63,5 +63,5 @@ def test_embedding_fingerprint_controls_idempotency(test_settings):
     assert migrated.unchanged is False
     migrated_document = metadata.document_for_source("upload:faq.txt")
     assert migrated_document is not None
-    assert migrated_document.embedding_fingerprint == "test:embedding-v2"
+    assert migrated_document.embedding_fingerprint == migrated_service.index_fingerprint
     assert first_vector_ids.isdisjoint(vectors.records)

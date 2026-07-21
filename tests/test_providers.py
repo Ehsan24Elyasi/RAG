@@ -6,7 +6,7 @@ from app.config import Settings
 from app.llm import provider
 
 
-def test_sentence_transformer_embedding_provider(monkeypatch):
+def test_sentence_transformer_embedding_provider_normalizes_without_download(monkeypatch):
     model = Mock()
     model.encode.return_value = np.array([[1.0, 2.0], [3.0, 4.0]])
     constructor = Mock(return_value=model)
@@ -16,9 +16,25 @@ def test_sentence_transformer_embedding_provider(monkeypatch):
 
     assert embeddings.embed([]) == []
     assert embeddings.embed(["سلام", "hello"]) == [[1.0, 2.0], [3.0, 4.0]]
-    assert embeddings.fingerprint == "sentence-transformers:multilingual-model"
+    assert embeddings.fingerprint == "sentence-transformers:multilingual-model:normalized-v1"
     constructor.assert_called_once_with("multilingual-model")
-    model.encode.assert_called_once_with(["سلام", "hello"], convert_to_numpy=True)
+    model.encode.assert_called_once_with(["سلام", "hello"], convert_to_numpy=True, normalize_embeddings=True)
+
+
+def test_openai_provider_preserves_native_roles(monkeypatch):
+    client = Mock()
+    client.chat.completions.create.return_value.choices = [Mock(message=Mock(content="answer"))]
+    monkeypatch.setattr(provider, "OpenAI", Mock(return_value=client))
+    chat = provider.OpenAICompatibleChatProvider("key", "model", "https://example.test/v1")
+
+    assert (
+        chat.generate([{"role": "system", "content": "policy"}, {"role": "user", "content": "سلام"}])
+        == "answer"
+    )
+    assert client.chat.completions.create.call_args.kwargs["messages"] == [
+        {"role": "system", "content": "policy"},
+        {"role": "user", "content": "سلام"},
+    ]
 
 
 def test_embedding_factory_uses_configured_local_model(monkeypatch):

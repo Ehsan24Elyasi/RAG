@@ -50,6 +50,11 @@ class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
 
 
+class PublicConfigResponse(BaseModel):
+    assistant_name: str
+    company_name: str
+
+
 class IngestionRunResponse(BaseModel):
     id: str
     kind: str

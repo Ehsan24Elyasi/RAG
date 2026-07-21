@@ -116,7 +116,7 @@
   </svg>
 
   <script type="module">
-    import { chatApi, ApiError } from "./static/api.js";
+    import { chatApi, configApi, ApiError } from "./static/api.js";
 
     const STORAGE_KEY = "basalam-rag-chat-v1";
     const MAX_STORED_MESSAGES = 20;
@@ -140,56 +140,113 @@
 
     const toPersianNumber = (value) => Number(value).toLocaleString("fa-IR");
     function formatTime(iso) { return new Intl.DateTimeFormat("fa-IR", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso)); }
+    function createMessageId() {
+      return `m-${Date.now().toString(36)}-${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
+    }
     function readMessages() {
       try {
         const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-        return Array.isArray(value) ? value.filter(item => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string").slice(-MAX_STORED_MESSAGES) : [];
+        if (!Array.isArray(value)) return [];
+        return value.filter(item => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string")
+          .slice(-MAX_STORED_MESSAGES)
+          .map(item => ({ ...item, id: typeof item.id === "string" && item.id ? item.id : createMessageId(), createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(), sources: Array.isArray(item.sources) ? item.sources : [] }));
       } catch { return []; }
     }
     function saveMessages() {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(storedMessages.slice(-MAX_STORED_MESSAGES))); } catch { /* Storage availability must not prevent chatting. */ }
     }
     function scrollToEnd() { messages.scrollTop = messages.scrollHeight; }
+    const SOURCE_TYPE_LABELS = { web: "صفحهٔ وب", website: "صفحهٔ وب", url: "صفحهٔ وب", upload: "فایل بارگذاری‌شده", pdf: "فایل PDF", document: "سند", file: "فایل", text: "متن", faq: "پرسش‌های متداول" };
+    function sourceTypeLabel(value) {
+      const key = String(value || "").trim().toLowerCase();
+      return SOURCE_TYPE_LABELS[key] || (key ? "سند" : "منبع");
+    }
+    function normalizedSourceId(source, fallbackIndex) {
+      return /^S[1-9]\d*$/.test(String(source?.id || "")) ? String(source.id) : `S${fallbackIndex + 1}`;
+    }
+    function sourceTargetId(messageId, sourceId) { return `source-${messageId}-${sourceId}`; }
+    function createCitation(messageId, source) {
+      const sourceId = normalizedSourceId(source, 0);
+      const citation = document.createElement("button");
+      citation.type = "button"; citation.className = "citation-chip"; citation.textContent = `[${sourceId}]`;
+      citation.setAttribute("aria-label", `نمایش منبع ${sourceId}`);
+      citation.addEventListener("click", () => {
+        const target = document.getElementById(sourceTargetId(messageId, sourceId));
+        const details = target?.closest("details");
+        if (details) details.open = true;
+        target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        target?.focus({ preventScroll: true });
+      });
+      return citation;
+    }
+    function appendInlineText(parent, text, messageId, sources) {
+      const pattern = /(\*\*([^*\n]+)\*\*|__([^_\n]+)__|`([^`\n]+)`|\*([^*\n]+)\*|_([^_\n]+)_|\[S(\d+)\])/g;
+      let cursor = 0; let match;
+      while ((match = pattern.exec(text))) {
+        if (match.index > cursor) parent.append(document.createTextNode(text.slice(cursor, match.index)));
+        if (match[2] || match[3]) {
+          const strong = document.createElement("strong"); strong.textContent = match[2] || match[3]; parent.append(strong);
+        } else if (match[4]) {
+          const code = document.createElement("code"); code.textContent = match[4]; parent.append(code);
+        } else if (match[5] || match[6]) {
+          const emphasis = document.createElement("em"); emphasis.textContent = match[5] || match[6]; parent.append(emphasis);
+        } else {
+          const sourceId = `S${Number(match[7])}`;
+          const source = sources.find((item, index) => normalizedSourceId(item, index) === sourceId);
+          parent.append(source ? createCitation(messageId, source) : document.createTextNode(match[0]));
+        }
+        cursor = pattern.lastIndex;
+      }
+      if (cursor < text.length) parent.append(document.createTextNode(text.slice(cursor)));
+    }
+    function renderAssistantContent(bubble, content, messageId, sources) {
+      const lines = String(content).replace(/\r\n?/g, "\n").split("\n"); let index = 0;
+      while (index < lines.length) {
+        if (!lines[index].trim()) { index += 1; continue; }
+        const listMatch = lines[index].match(/^\s*([-*•])\s+(.+)$/) || lines[index].match(/^\s*(\d+)[.)]\s+(.+)$/);
+        if (listMatch) {
+          const ordered = /^\s*\d+[.)]\s+/.test(lines[index]); const list = document.createElement(ordered ? "ol" : "ul");
+          while (index < lines.length) {
+            const match = ordered ? lines[index].match(/^\s*\d+[.)]\s+(.+)$/) : lines[index].match(/^\s*[-*•]\s+(.+)$/);
+            if (!match) break;
+            const li = document.createElement("li"); appendInlineText(li, match[1], messageId, sources); list.append(li); index += 1;
+          }
+          bubble.append(list); continue;
+        }
+        if (/^\s*(?:\*\*[^*]+\*\*|__[^_]+__)\s*[:：]/.test(lines[index])) {
+          const detail = document.createElement("p"); detail.className = "answer-detail";
+          appendInlineText(detail, lines[index].trim(), messageId, sources); bubble.append(detail); index += 1; continue;
+        }
+        const paragraph = document.createElement("p"); const paragraphLines = [];
+        while (index < lines.length && lines[index].trim() && !lines[index].match(/^\s*(?:[-*•]\s+|\d+[.)]\s+)/)) { paragraphLines.push(lines[index].trim()); index += 1; }
+        appendInlineText(paragraph, paragraphLines.join(" "), messageId, sources); bubble.append(paragraph);
+      }
+      if (!bubble.children.length) bubble.textContent = String(content);
+    }
     function createMessage(message) {
-      const item = document.createElement("article");
-      item.className = `message ${message.role}`;
-      const bubble = document.createElement("div");
-      bubble.className = "message-bubble";
-      bubble.dir = "auto";
-      bubble.textContent = message.content;
+      const item = document.createElement("article"); item.className = `message ${message.role}`; item.dataset.messageId = message.id;
+      const bubble = document.createElement("div"); bubble.className = "message-bubble"; bubble.dir = "auto";
+      if (message.role === "assistant") renderAssistantContent(bubble, message.content, message.id, message.sources || []); else bubble.textContent = message.content;
       item.append(bubble);
-      if (message.role === "assistant" && Array.isArray(message.sources) && message.sources.length) item.append(createSources(message.sources));
-      const meta = document.createElement("time");
-      meta.className = "message-meta";
-      meta.dateTime = message.createdAt || new Date().toISOString();
-      meta.textContent = formatTime(meta.dateTime);
-      item.append(meta);
+      if (message.role === "assistant" && message.sources?.length) item.append(createSources(message.sources, message.id));
+      const meta = document.createElement("time"); meta.className = "message-meta"; meta.dateTime = message.createdAt; meta.textContent = formatTime(meta.dateTime); item.append(meta);
       return item;
     }
-    function createSources(sources) {
-      const details = document.createElement("details");
-      details.className = "message-sources";
-      const summary = document.createElement("summary");
-      summary.textContent = `منابع پاسخ (${toPersianNumber(sources.length)})`;
-      const list = document.createElement("ol");
-      list.className = "source-list";
+    function createSources(sources, messageId) {
+      const details = document.createElement("details"); details.className = "message-sources";
+      const summary = document.createElement("summary"); summary.textContent = `منابع پاسخ (${toPersianNumber(sources.length)})`;
+      const list = document.createElement("ol"); list.className = "source-list";
       sources.slice(0, 8).forEach((source, index) => {
-        const li = document.createElement("li");
-        const title = String(source.title || source.source_name || `منبع ${toPersianNumber(index + 1)}`);
-        if (typeof source.url === "string" && /^https?:\/\//i.test(source.url)) {
-          const link = document.createElement("a");
-          link.href = source.url;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.textContent = title;
-          li.append(link);
-        } else { li.textContent = title; }
-        const descriptor = [source.source_type, Number.isFinite(Number(source.chunk_index)) ? `بخش ${toPersianNumber(Number(source.chunk_index) + 1)}` : null].filter(Boolean).join(" · ");
-        if (descriptor) { const note = document.createElement("span"); note.textContent = ` (${descriptor})`; li.append(note); }
-        list.append(li);
+        const sourceId = normalizedSourceId(source, index);
+        const li = document.createElement("li"); li.id = sourceTargetId(messageId, sourceId); li.tabIndex = -1;
+        const tag = document.createElement("span"); tag.className = "source-tag"; tag.textContent = `[${sourceId}]`;
+        const title = String(source?.title || source?.source_name || `منبع ${toPersianNumber(index + 1)}`);
+        li.append(tag, document.createTextNode(" "));
+        if (typeof source?.url === "string" && /^https?:\/\//i.test(source.url)) { const link = document.createElement("a"); link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = title; li.append(link); } else li.append(document.createTextNode(title));
+        const parts = [sourceTypeLabel(source?.source_type), Number.isFinite(Number(source?.chunk_index)) ? `بخش ${toPersianNumber(Number(source.chunk_index) + 1)}` : null].filter(Boolean);
+        const note = document.createElement("span"); note.className = "source-descriptor"; note.textContent = ` (${parts.join(" · ")})`; li.append(note); list.append(li);
       });
-      details.append(summary, list);
-      return details;
+      details.append(summary, list); return details;
     }
     function renderSavedMessages() {
       welcome.hidden = storedMessages.length > 0;
@@ -201,17 +258,17 @@
         lastFocusedElement = document.activeElement;
         panel.classList.add("is-open"); panel.setAttribute("aria-hidden", "false"); launcher.dataset.open = "true";
         panel.inert = false; document.body.classList.add("chat-is-open");
-        launcher.setAttribute("aria-expanded", "true"); launcher.setAttribute("aria-label", "بستن گفت‌وگوی پشتیبانی");
+        launcher.setAttribute("aria-expanded", "true"); launcher.setAttribute("aria-label", launcher.dataset.closeLabel || "بستن گفت‌وگو");
         window.setTimeout(() => input.focus(), 100);
       } else {
         panel.classList.remove("is-open"); panel.setAttribute("aria-hidden", "true"); launcher.dataset.open = "false";
         panel.inert = true; document.body.classList.remove("chat-is-open");
-        launcher.setAttribute("aria-expanded", "false"); launcher.setAttribute("aria-label", "باز کردن گفت‌وگوی پشتیبانی");
+        launcher.setAttribute("aria-expanded", "false"); launcher.setAttribute("aria-label", launcher.dataset.openLabel || "باز کردن گفت‌وگو");
         if (lastFocusedElement instanceof HTMLElement) lastFocusedElement.focus(); else launcher.focus();
       }
     }
     function setBusy(busy) {
-      input.disabled = busy; sendButton.disabled = busy; resetButton.disabled = busy;
+      input.disabled = busy; sendButton.disabled = busy;
       form.setAttribute("aria-busy", String(busy));
     }
     function showLoading() {
@@ -226,37 +283,68 @@
       const node = document.createElement("div"); node.id = "chat-error"; node.className = "chat-error"; node.setAttribute("role", "alert");
       const label = document.createElement("span"); label.textContent = text;
       const retry = document.createElement("button"); retry.className = "button"; retry.type = "button"; retry.textContent = "تلاش مجدد";
-      retry.addEventListener("click", () => { if (pendingMessage) sendMessage(pendingMessage); });
+      retry.addEventListener("click", () => { if (pendingMessage) requestAnswer(pendingMessage); });
       node.append(label, retry); messages.append(node); scrollToEnd();
     }
     function resizeInput() { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 115)}px`; }
     function updateCharCount() { charCount.textContent = `${toPersianNumber(input.value.length)}/۲۰٬۰۰۰`; }
-    async function sendMessage(rawMessage) {
-      const message = rawMessage.trim();
-      if (!message || requestController) return;
-      clearTransient(); pendingMessage = message; requestController = new AbortController(); setBusy(true);
-      const userEntry = { role: "user", content: message, createdAt: new Date().toISOString() };
+    function configText(value, fallback) { return typeof value === "string" && value.trim() ? value.trim().slice(0, 240) : fallback; }
+    function applyConfig(payload) {
+      const config = payload && typeof payload === "object" && payload.config && typeof payload.config === "object" ? payload.config : (payload || {});
+      const assistant = configText(config.assistant_name || config.assistantName || config.assistant?.name, "پاسخ‌یار");
+      const company = configText(config.company_name || config.companyName || config.company?.name, "پشتیبانی هوشمند");
+      const title = configText(config.page_title || config.pageTitle || config.title, `${assistant} | ${company}`);
+      const greeting = configText(config.greeting || config.welcome_message || config.welcomeMessage, "سلام، خوش آمدید.\nبرای کمک، سؤال خود را بنویسید. پاسخ‌ها بر پایهٔ منابع ثبت‌شده ارائه می‌شوند.");
+      document.title = title;
+      document.querySelectorAll(".brand > span:last-child").forEach(node => { node.firstChild.nodeValue = assistant; const small = node.querySelector("small"); if (small) small.textContent = company; });
+      document.querySelector("#chat-title").textContent = assistant;
+      document.querySelector(".chat-agent small").textContent = configText(config.chat_subtitle || config.chatSubtitle, "پرسش خود را بنویسید");
+      document.querySelector(".ask-card-header").lastChild.nodeValue = assistant;
+      welcome.replaceChildren(); greeting.split("\n").forEach((line, index) => { if (index) welcome.append(document.createElement("br")); const node = index === 0 ? document.createElement("strong") : document.createTextNode(line); node.textContent = line; welcome.append(node); });
+      const launcherLabel = configText(config.launcher_aria_label || config.launcherAriaLabel, `باز کردن گفت‌وگوی ${assistant}`);
+      launcher.setAttribute("aria-label", launcherLabel); launcher.dataset.openLabel = launcherLabel; launcher.dataset.closeLabel = configText(config.close_launcher_aria_label || config.closeLauncherAriaLabel, `بستن گفت‌وگوی ${assistant}`);
+      closeButton.setAttribute("aria-label", configText(config.close_aria_label || config.closeAriaLabel, "بستن گفت‌وگو"));
+      resetButton.setAttribute("aria-label", configText(config.reset_aria_label || config.resetAriaLabel, "پاک کردن گفت‌وگو و شروع مجدد"));
+      input.setAttribute("aria-label", configText(config.input_aria_label || config.inputAriaLabel, "پیام شما"));
+      input.placeholder = configText(config.input_placeholder || config.inputPlaceholder, "سؤال خود را بنویسید…");
+      sendButton.setAttribute("aria-label", configText(config.send_aria_label || config.sendAriaLabel, "ارسال پیام"));
+    }
+    async function loadConfig() { try { applyConfig(await configApi()); } catch { /* Default copy remains available when configuration is unavailable. */ } }
+    function appendNewMessage(rawMessage) {
+      const content = rawMessage.trim(); if (!content) return null;
+      const userEntry = { id: createMessageId(), role: "user", content, createdAt: new Date().toISOString() };
       storedMessages.push(userEntry); storedMessages = storedMessages.slice(-MAX_STORED_MESSAGES); saveMessages();
-      welcome.hidden = true; messages.append(createMessage(userEntry)); input.value = ""; resizeInput(); updateCharCount(); showLoading();
-      const history = storedMessages.slice(0, -1).slice(-MAX_HISTORY_MESSAGES).map(({ role, content }) => ({ role, content }));
+      welcome.hidden = true; messages.append(createMessage(userEntry)); input.value = ""; resizeInput(); updateCharCount();
+      return { userId: userEntry.id, content, history: storedMessages.slice(0, -1).slice(-MAX_HISTORY_MESSAGES).map(({ role, content: priorContent }) => ({ role, content: priorContent })) };
+    }
+    async function requestAnswer(request) {
+      if (!request || requestController) return;
+      clearTransient(); pendingMessage = request; const controller = new AbortController(); requestController = controller; setBusy(true); showLoading();
       try {
-        const response = await chatApi(message, history, requestController.signal);
+        const response = await chatApi(request.content, request.history, controller.signal);
+        if (requestController !== controller || !storedMessages.some(item => item.id === request.userId)) return;
         clearTransient();
         const answer = typeof response?.answer === "string" ? response.answer : "پاسخی از سرویس دریافت نشد.";
-        const sources = Array.isArray(response?.sources) ? response.sources.map(source => ({ id: source?.id, document_id: source?.document_id, title: source?.title, source_name: source?.source_name, source_type: source?.source_type, url: source?.url, chunk_index: source?.chunk_index })) : [];
-        const assistantEntry = { role: "assistant", content: answer, sources, createdAt: new Date().toISOString() };
+        const sources = Array.isArray(response?.sources) ? response.sources.slice(0, 8).map(source => ({ id: source?.id, document_id: source?.document_id, title: source?.title, source_name: source?.source_name, source_type: source?.source_type, url: source?.url, chunk_index: source?.chunk_index })) : [];
+        const assistantEntry = { id: createMessageId(), role: "assistant", content: answer, sources, createdAt: new Date().toISOString() };
         storedMessages.push(assistantEntry); storedMessages = storedMessages.slice(-MAX_STORED_MESSAGES); saveMessages(); messages.append(createMessage(assistantEntry)); scrollToEnd(); pendingMessage = null;
       } catch (error) {
-        clearTransient();
-        if (error?.name !== "AbortError") showError(error instanceof ApiError ? error.message : "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.");
-      } finally { requestController = null; setBusy(false); input.focus(); }
+        if (requestController !== controller) return;
+        clearTransient(); if (error?.name !== "AbortError") showError(error instanceof ApiError ? error.message : "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.");
+      } finally {
+        if (requestController === controller) { requestController = null; setBusy(false); input.focus(); }
+      }
+    }
+    function sendMessage(rawMessage) {
+      if (requestController) return;
+      const request = appendNewMessage(rawMessage); if (request) requestAnswer(request);
     }
     launcher.addEventListener("click", () => setOpen(!panel.classList.contains("is-open")));
     closeButton.addEventListener("click", () => setOpen(false));
     heroButton.addEventListener("click", () => setOpen(true));
     resetButton.addEventListener("click", () => {
       if (!window.confirm("گفت‌وگوی فعلی پاک شود؟")) return;
-      requestController?.abort(); storedMessages = []; pendingMessage = null; saveMessages();
+      requestController?.abort(); requestController = null; pendingMessage = null; storedMessages = []; saveMessages(); clearTransient(); setBusy(false);
       [...messages.children].forEach(child => { if (child !== welcome) child.remove(); }); welcome.hidden = false; input.focus();
     });
     form.addEventListener("submit", event => { event.preventDefault(); sendMessage(input.value); });
@@ -272,7 +360,7 @@
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
       }
     });
-    renderSavedMessages(); resizeInput(); updateCharCount();
+    renderSavedMessages(); saveMessages(); resizeInput(); updateCharCount(); loadConfig();
   </script>
 </body>
 </html>
