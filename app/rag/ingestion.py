@@ -1,39 +1,53 @@
-from pathlib import Path
+from __future__ import annotations
+
 import json
+from io import BytesIO
+from pathlib import Path
 
 from pypdf import PdfReader
+from pypdf.errors import PyPdfError
+
+SUPPORTED_EXTENSIONS = {".txt", ".json", ".pdf"}
 
 
-def _read_pdf_text(path: Path) -> str:
-    reader = PdfReader(str(path))
-    return "\n".join((page.extract_text() or "") for page in reader.pages)
+class DocumentParseError(ValueError):
+    """Raised when an uploaded document is unsupported or unsafe to process."""
 
 
-def load_raw_documents(raw_data_dir: str) -> list[dict]:
-    base = Path(raw_data_dir)
-    if not base.exists():
-        return []
+def parse_document_bytes(
+    filename: str,
+    content: bytes,
+    *,
+    max_extracted_chars: int | None = None,
+    max_pdf_pages: int | None = None,
+) -> tuple[str, str]:
+    suffix = Path(filename).suffix.lower()
+    if suffix not in SUPPORTED_EXTENSIONS:
+        raise DocumentParseError("Only TXT, PDF, and JSON files are supported.")
+    if not content:
+        raise DocumentParseError("The uploaded document is empty.")
 
-    docs: list[dict] = []
-    for path in base.rglob("*"):
-        if not path.is_file() or path.suffix.lower() not in {".txt", ".md", ".json", ".pdf"}:
-            continue
-
-        content = ""
-        if path.suffix.lower() == ".json":
-            content = json.dumps(json.loads(path.read_text(encoding="utf-8")), ensure_ascii=False)
-        elif path.suffix.lower() == ".pdf":
-            content = _read_pdf_text(path)
+    try:
+        if suffix == ".txt":
+            text = content.decode("utf-8")
+        elif suffix == ".json":
+            value = json.loads(content.decode("utf-8"))
+            text = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2)
         else:
-            content = path.read_text(encoding="utf-8")
+            if not content.startswith(b"%PDF-"):
+                raise DocumentParseError("The PDF signature is invalid.")
+            reader = PdfReader(BytesIO(content))
+            if max_pdf_pages is not None and len(reader.pages) > max_pdf_pages:
+                raise DocumentParseError("The PDF exceeds the page limit.")
+            text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
+    except DocumentParseError:
+        raise
+    except (RecursionError, UnicodeDecodeError, json.JSONDecodeError, OSError, PyPdfError, ValueError) as exc:
+        raise DocumentParseError("The document could not be parsed.") from exc
 
-        docs.append(
-            {
-                "text": content,
-                "source_path": str(path),
-                "file_name": path.name,
-                "doc_type": path.suffix.lower().lstrip("."),
-            }
-        )
-
-    return docs
+    text = "\n".join(line.rstrip() for line in text.replace("\x00", "").splitlines()).strip()
+    if not text:
+        raise DocumentParseError("The document contains no extractable text.")
+    if max_extracted_chars is not None and len(text) > max_extracted_chars:
+        raise DocumentParseError("The extracted text exceeds the configured limit.")
+    return text, suffix.lstrip(".")

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#13795b">
+  <meta name="description" content="پاسخ‌گویی سریع و دقیق به پرسش‌های شما">
+  <title>پاسخ‌یار | پشتیبانی هوشمند</title>
+  <link rel="icon" href="./static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./static/styles.css">
+</head>
+<body>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="صفحهٔ اصلی پاسخ‌یار">
+        <span class="brand-mark" aria-hidden="true">پ</span>
+        <span>پاسخ‌یار<small>پشتیبانی هوشمند</small></span>
+      </a>
+      <a class="header-link" href="/admin">مدیریت دانش‌نامه</a>
+    </header>
+
+    <main class="landing-main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-content">
+          <p class="eyebrow">همیشه در دسترس شما</p>
+          <h1 id="hero-title">پاسخ پرسش‌هایتان، <strong>سریع و با استناد</strong></h1>
+          <p class="hero-text">پاسخ‌یار در منابع معتبر جست‌وجو می‌کند تا بتوانید پاسخ موردنیازتان را همراه با منبع آن پیدا کنید.</p>
+          <div class="hero-actions">
+            <button class="button button-primary" type="button" id="hero-chat-button">
+              گفت‌وگو را شروع کنید
+              <svg class="icon" aria-hidden="true"><use href="#icon-arrow"></use></svg>
+            </button>
+            <a class="button button-secondary" href="#features">بیشتر بدانید</a>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="hero-orb"></div>
+          <div class="ask-card">
+            <div class="ask-card-header"><span class="ask-card-avatar">پ</span>پاسخ‌یار</div>
+            <p class="sample-question">شرایط ارسال سفارش چیست؟</p>
+            <div class="sample-answer">جزئیات شرایط ارسال در صفحهٔ راهنمای سفارش‌ها آمده است.<div class="sample-line"></div><div class="sample-line short"></div></div>
+          </div>
+          <span class="floating-pill">پاسخ همراه با منبع</span>
+        </div>
+      </section>
+    </main>
+
+    <section class="features" id="features" aria-labelledby="features-title">
+      <div class="landing-main">
+        <div class="section-heading">
+          <h2 id="features-title">کمک گرفتن، بدون پیچیدگی</h2>
+          <p>سؤال خود را به زبان طبیعی بنویسید؛ پاسخ‌یار در اسناد و صفحات ثبت‌شده به دنبال پاسخ می‌گردد.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg></div>
+            <h3>جست‌وجوی متمرکز</h3><p>پاسخ‌ها بر اساس محتوای مرتبط دانش‌نامه تهیه می‌شوند.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#icon-book"></use></svg></div>
+            <h3>منابع قابل بررسی</h3><p>در هر پاسخ، منابع استفاده‌شده را برای بررسی بیشتر ببینید.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+            <h3>گفت‌وگوی خصوصی</h3><p>تاریخچهٔ کوتاه گفت‌وگو فقط در مرورگر شما نگه‌داری می‌شود.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+    <footer class="site-footer">پاسخ‌یار · برای پاسخ‌گویی بهتر در کنار شما</footer>
+  </div>
+
+  <button class="chat-launcher" id="chat-launcher" type="button" aria-label="باز کردن گفت‌وگوی پشتیبانی" aria-expanded="false" aria-controls="chat-panel">
+    <svg class="icon" aria-hidden="true"><use href="#icon-chat"></use></svg>
+  </button>
+
+  <section class="chat-panel" id="chat-panel" role="dialog" aria-modal="true" aria-labelledby="chat-title" aria-hidden="true">
+    <header class="chat-topbar">
+      <div class="chat-agent">
+        <span class="chat-agent-mark" aria-hidden="true">پ</span>
+        <span><strong id="chat-title">پاسخ‌یار</strong><small>پرسش خود را بنویسید</small></span>
+      </div>
+      <button class="button button-quiet" id="chat-reset" type="button" title="شروع گفت‌وگوی جدید" aria-label="پاک کردن گفت‌وگو و شروع مجدد">
+        <svg class="icon" aria-hidden="true"><use href="#icon-reset"></use></svg>
+      </button>
+      <button class="button button-quiet" id="chat-close" type="button" title="بستن" aria-label="بستن گفت‌وگو">
+        <svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+      </button>
+    </header>
+    <div class="chat-content">
+      <div class="chat-messages" id="chat-messages" aria-live="polite" aria-relevant="additions text">
+        <div class="chat-welcome" id="chat-welcome"><strong>سلام، خوش آمدید.</strong><br>برای کمک، سؤال خود را بنویسید. پاسخ‌ها بر پایهٔ منابع ثبت‌شده ارائه می‌شوند.</div>
+      </div>
+      <form class="chat-form" id="chat-form">
+        <label class="sr-only" for="chat-input">پیام شما</label>
+        <div class="chat-compose">
+          <textarea id="chat-input" name="message" dir="auto" rows="1" maxlength="20000" placeholder="سؤال خود را بنویسید…" autocomplete="off"></textarea>
+          <button class="chat-send" id="chat-send" type="submit" aria-label="ارسال پیام" title="ارسال پیام">
+            <svg class="icon" aria-hidden="true"><use href="#icon-send"></use></svg>
+          </button>
+        </div>
+        <div class="chat-hint"><span>برای ارسال، Enter را بزنید</span><span id="char-count">۰/۲۰٬۰۰۰</span></div>
+      </form>
+    </div>
+  </section>
+
+  <svg width="0" height="0" class="sr-only" aria-hidden="true" focusable="false">
+    <symbol id="icon-chat" viewBox="0 0 24 24"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.48 8.6 8.6 0 0 1-3.86-.95L4 19l1.1-3.15A7.34 7.34 0 0 1 4 12c0-4.14 3.58-7.5 8-7.5s8 3.36 8 7.5Z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="icon-reset" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 1-2.34-5.66L20 8"/><path d="M20 4v4h-4"/></symbol>
+    <symbol id="icon-send" viewBox="0 0 24 24"><path d="m21 3-7.8 18-3.6-7.2L3 10.2 21 3Z"/><path d="m9.5 13.8 4.2-4.2"/></symbol>
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.3-4.3"/></symbol>
+    <symbol id="icon-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z"/><path d="M4 19h16"/></symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6l8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-4.8"/></symbol>
+  </svg>
+
+  <script type="module">
+    import { chatApi, ApiError } from "./static/api.js";
+
+    const STORAGE_KEY = "basalam-rag-chat-v1";
+    const MAX_STORED_MESSAGES = 20;
+    const MAX_HISTORY_MESSAGES = 12;
+    const panel = document.querySelector("#chat-panel");
+    const launcher = document.querySelector("#chat-launcher");
+    const closeButton = document.querySelector("#chat-close");
+    const resetButton = document.querySelector("#chat-reset");
+    const heroButton = document.querySelector("#hero-chat-button");
+    const form = document.querySelector("#chat-form");
+    const input = document.querySelector("#chat-input");
+    const messages = document.querySelector("#chat-messages");
+    const welcome = document.querySelector("#chat-welcome");
+    const sendButton = document.querySelector("#chat-send");
+    const charCount = document.querySelector("#char-count");
+    panel.inert = true;
+    let storedMessages = readMessages();
+    let lastFocusedElement = null;
+    let pendingMessage = null;
+    let requestController = null;
+
+    const toPersianNumber = (value) => Number(value).toLocaleString("fa-IR");
+    function formatTime(iso) { return new Intl.DateTimeFormat("fa-IR", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso)); }
+    function readMessages() {
+      try {
+        const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        return Array.isArray(value) ? value.filter(item => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string").slice(-MAX_STORED_MESSAGES) : [];
+      } catch { return []; }
+    }
+    function saveMessages() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(storedMessages.slice(-MAX_STORED_MESSAGES))); } catch { /* Storage availability must not prevent chatting. */ }
+    }
+    function scrollToEnd() { messages.scrollTop = messages.scrollHeight; }
+    function createMessage(message) {
+      const item = document.createElement("article");
+      item.className = `message ${message.role}`;
+      const bubble = document.createElement("div");
+      bubble.className = "message-bubble";
+      bubble.dir = "auto";
+      bubble.textContent = message.content;
+      item.append(bubble);
+      if (message.role === "assistant" && Array.isArray(message.sources) && message.sources.length) item.append(createSources(message.sources));
+      const meta = document.createElement("time");
+      meta.className = "message-meta";
+      meta.dateTime = message.createdAt || new Date().toISOString();
+      meta.textContent = formatTime(meta.dateTime);
+      item.append(meta);
+      return item;
+    }
+    function createSources(sources) {
+      const details = document.createElement("details");
+      details.className = "message-sources";
+      const summary = document.createElement("summary");
+      summary.textContent = `منابع پاسخ (${toPersianNumber(sources.length)})`;
+      const list = document.createElement("ol");
+      list.className = "source-list";
+      sources.slice(0, 8).forEach((source, index) => {
+        const li = document.createElement("li");
+        const title = String(source.title || source.source_name || `منبع ${toPersianNumber(index + 1)}`);
+        if (typeof source.url === "string" && /^https?:\/\//i.test(source.url)) {
+          const link = document.createElement("a");
+          link.href = source.url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = title;
+          li.append(link);
+        } else { li.textContent = title; }
+        const descriptor = [source.source_type, Number.isFinite(Number(source.chunk_index)) ? `بخش ${toPersianNumber(Number(source.chunk_index) + 1)}` : null].filter(Boolean).join(" · ");
+        if (descriptor) { const note = document.createElement("span"); note.textContent = ` (${descriptor})`; li.append(note); }
+        list.append(li);
+      });
+      details.append(summary, list);
+      return details;
+    }
+    function renderSavedMessages() {
+      welcome.hidden = storedMessages.length > 0;
+      storedMessages.forEach(message => messages.append(createMessage(message)));
+      scrollToEnd();
+    }
+    function setOpen(open) {
+      if (open) {
+        lastFocusedElement = document.activeElement;
+        panel.classList.add("is-open"); panel.setAttribute("aria-hidden", "false"); launcher.dataset.open = "true";
+        panel.inert = false; document.body.classList.add("chat-is-open");
+        launcher.setAttribute("aria-expanded", "true"); launcher.setAttribute("aria-label", "بستن گفت‌وگوی پشتیبانی");
+        window.setTimeout(() => input.focus(), 100);
+      } else {
+        panel.classList.remove("is-open"); panel.setAttribute("aria-hidden", "true"); launcher.dataset.open = "false";
+        panel.inert = true; document.body.classList.remove("chat-is-open");
+        launcher.setAttribute("aria-expanded", "false"); launcher.setAttribute("aria-label", "باز کردن گفت‌وگوی پشتیبانی");
+        if (lastFocusedElement instanceof HTMLElement) lastFocusedElement.focus(); else launcher.focus();
+      }
+    }
+    function setBusy(busy) {
+      input.disabled = busy; sendButton.disabled = busy; resetButton.disabled = busy;
+      form.setAttribute("aria-busy", String(busy));
+    }
+    function showLoading() {
+      const node = document.createElement("div"); node.className = "chat-loading"; node.id = "chat-loading";
+      const text = document.createElement("span"); text.textContent = "در حال یافتن پاسخ";
+      const dots = document.createElement("span"); dots.className = "loading-dots"; dots.setAttribute("aria-hidden", "true");
+      dots.append(document.createElement("span"), document.createElement("span"), document.createElement("span"));
+      node.append(text, dots); messages.append(node); scrollToEnd();
+    }
+    function clearTransient() { document.querySelector("#chat-loading")?.remove(); document.querySelector("#chat-error")?.remove(); }
+    function showError(text) {
+      const node = document.createElement("div"); node.id = "chat-error"; node.className = "chat-error"; node.setAttribute("role", "alert");
+      const label = document.createElement("span"); label.textContent = text;
+      const retry = document.createElement("button"); retry.className = "button"; retry.type = "button"; retry.textContent = "تلاش مجدد";
+      retry.addEventListener("click", () => { if (pendingMessage) sendMessage(pendingMessage); });
+      node.append(label, retry); messages.append(node); scrollToEnd();
+    }
+    function resizeInput() { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 115)}px`; }
+    function updateCharCount() { charCount.textContent = `${toPersianNumber(input.value.length)}/۲۰٬۰۰۰`; }
+    async function sendMessage(rawMessage) {
+      const message = rawMessage.trim();
+      if (!message || requestController) return;
+      clearTransient(); pendingMessage = message; requestController = new AbortController(); setBusy(true);
+      const userEntry = { role: "user", content: message, createdAt: new Date().toISOString() };
+      storedMessages.push(userEntry); storedMessages = storedMessages.slice(-MAX_STORED_MESSAGES); saveMessages();
+      welcome.hidden = true; messages.append(createMessage(userEntry)); input.value = ""; resizeInput(); updateCharCount(); showLoading();
+      const history = storedMessages.slice(0, -1).slice(-MAX_HISTORY_MESSAGES).map(({ role, content }) => ({ role, content }));
+      try {
+        const response = await chatApi(message, history, requestController.signal);
+        clearTransient();
+        const answer = typeof response?.answer === "string" ? response.answer : "پاسخی از سرویس دریافت نشد.";
+        const sources = Array.isArray(response?.sources) ? response.sources.map(source => ({ id: source?.id, document_id: source?.document_id, title: source?.title, source_name: source?.source_name, source_type: source?.source_type, url: source?.url, chunk_index: source?.chunk_index })) : [];
+        const assistantEntry = { role: "assistant", content: answer, sources, createdAt: new Date().toISOString() };
+        storedMessages.push(assistantEntry); storedMessages = storedMessages.slice(-MAX_STORED_MESSAGES); saveMessages(); messages.append(createMessage(assistantEntry)); scrollToEnd(); pendingMessage = null;
+      } catch (error) {
+        clearTransient();
+        if (error?.name !== "AbortError") showError(error instanceof ApiError ? error.message : "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.");
+      } finally { requestController = null; setBusy(false); input.focus(); }
+    }
+    launcher.addEventListener("click", () => setOpen(!panel.classList.contains("is-open")));
+    closeButton.addEventListener("click", () => setOpen(false));
+    heroButton.addEventListener("click", () => setOpen(true));
+    resetButton.addEventListener("click", () => {
+      if (!window.confirm("گفت‌وگوی فعلی پاک شود؟")) return;
+      requestController?.abort(); storedMessages = []; pendingMessage = null; saveMessages();
+      [...messages.children].forEach(child => { if (child !== welcome) child.remove(); }); welcome.hidden = false; input.focus();
+    });
+    form.addEventListener("submit", event => { event.preventDefault(); sendMessage(input.value); });
+    input.addEventListener("input", () => { resizeInput(); updateCharCount(); });
+    input.addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); } });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && panel.classList.contains("is-open")) { event.preventDefault(); setOpen(false); }
+      if (event.key === "Tab" && panel.classList.contains("is-open")) {
+        const focusable = [...panel.querySelectorAll('button:not([disabled]), textarea:not([disabled]), [href], summary')].filter(el => !el.hidden);
+        if (!focusable.length) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    });
+    renderSavedMessages(); resizeInput(); updateCharCount();
+  </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /data
+      SQLITE_PATH: /data/rag.sqlite3
+      CHROMA_PERSIST_DIR: /data/chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - rag_data:/data
+      - model_cache:/models
+    restart: unless-stopped
+
+volumes:
+  rag_data:
+  model_cache:

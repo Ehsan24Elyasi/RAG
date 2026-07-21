@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#13795b">
+  <title>مدیریت دانش‌نامه | پاسخ‌یار</title>
+  <link rel="icon" href="./static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./static/styles.css">
+</head>
+<body>
+  <section class="unlock-screen" id="unlock-screen">
+    <form class="unlock-card" id="unlock-form">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">پ</span><span>پاسخ‌یار<small>مدیریت دانش‌نامه</small></span></a>
+      <h1>ورود به پنل مدیریت</h1>
+      <p>کلید مدیریت فقط تا زمان باز بودن این برگه در مرورگر نگه‌داری می‌شود.</p>
+      <div class="field">
+        <label for="admin-key">کلید مدیریت</label>
+        <input class="input" id="admin-key" type="password" autocomplete="off" required placeholder="ADMIN_API_KEY">
+      </div>
+      <p class="unlock-error" id="unlock-error" role="alert" hidden></p>
+      <button class="button button-primary" type="submit" id="unlock-button">باز کردن پنل</button>
+    </form>
+  </section>
+
+  <div class="admin-shell" id="admin-shell" hidden>
+    <header class="admin-header">
+      <div class="admin-header-right">
+        <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">پ</span><span>پاسخ‌یار<small>مدیریت دانش‌نامه</small></span></a>
+        <span class="admin-title">مدیریت منابع پاسخ‌گویی</span>
+      </div>
+      <div>
+        <button class="button button-secondary" type="button" id="refresh-button">به‌روزرسانی</button>
+        <button class="button button-danger" type="button" id="logout-button">خروج</button>
+      </div>
+    </header>
+
+    <main class="admin-main">
+      <div class="admin-page-heading">
+        <div><h1>دانش‌نامه پشتیبانی</h1><p>فایل‌ها و صفحات راهنما را به سامانه اضافه و وضعیت پردازش را بررسی کنید.</p></div>
+        <span class="status-badge"><span class="status-dot" aria-hidden="true"></span><span id="system-status">در حال بررسی</span></span>
+      </div>
+
+      <section class="status-grid" aria-label="خلاصه وضعیت">
+        <article class="status-tile"><span class="status-tile-label">وضعیت سرویس</span><strong class="status-tile-value textual" id="status-value">—</strong><p class="status-tile-help">اتصال API و پایگاه داده</p></article>
+        <article class="status-tile"><span class="status-tile-label">اسناد فعال</span><strong class="status-tile-value" id="documents-value">۰</strong><p class="status-tile-help">فایل و صفحه وب</p></article>
+        <article class="status-tile"><span class="status-tile-label">بخش‌های نمایه‌شده</span><strong class="status-tile-value" id="chunks-value">۰</strong><p class="status-tile-help">قطعه‌های قابل جست‌وجو</p></article>
+        <article class="status-tile"><span class="status-tile-label">ارائه‌دهنده‌ها</span><strong class="status-tile-value textual" id="providers-value" dir="auto">—</strong><p class="status-tile-help">Chat / Embedding</p></article>
+      </section>
+
+      <div class="admin-grid">
+        <div class="admin-stack">
+          <section class="admin-card">
+            <div class="admin-card-heading"><div><h2>افزودن صفحه وب</h2><p>crawler فقط صفحه‌های عمومی و هم‌دامنه را پردازش می‌کند.</p></div></div>
+            <form class="admin-card-body" id="crawl-form">
+              <div class="field"><label for="crawl-url">نشانی صفحه</label><input class="input" id="crawl-url" type="url" dir="ltr" required placeholder="https://example.com/help"></div>
+              <div class="form-row">
+                <div class="field"><label for="crawl-pages">حداکثر صفحه</label><input class="input" id="crawl-pages" type="number" min="1" max="50" value="5"></div>
+                <div class="field"><label for="crawl-depth">عمق لینک</label><input class="input" id="crawl-depth" type="number" min="0" max="5" value="1"></div>
+              </div>
+              <button class="button button-primary" type="submit" id="crawl-button">شروع خزش</button>
+            </form>
+          </section>
+
+          <section class="admin-card">
+            <div class="admin-card-heading"><div><h2>بارگذاری فایل</h2><p>فایل‌های TXT، PDF و JSON را انتخاب یا در کادر رها کنید.</p></div></div>
+            <div class="admin-card-body">
+              <input class="sr-only" id="file-input" type="file" multiple accept=".txt,.pdf,.json,text/plain,application/pdf,application/json">
+              <button class="upload-dropzone" id="dropzone" type="button">
+                <span aria-hidden="true">⇧</span><strong>فایل را اینجا رها کنید</strong><p>یا برای انتخاب فایل کلیک کنید</p><span class="button button-secondary">انتخاب فایل</span>
+              </button>
+              <div class="file-queue" id="file-queue"></div>
+            </div>
+          </section>
+
+          <section class="admin-card">
+            <div class="admin-card-heading"><div><h2>پردازش‌های اخیر</h2><p>نتیجه بارگذاری و خزش‌های اخیر</p></div></div>
+            <div class="operation-list" id="operation-list"><p class="loading-state">هنوز عملیاتی ثبت نشده است.</p></div>
+          </section>
+        </div>
+
+        <section class="admin-card documents-card">
+          <div class="admin-card-heading"><div><h2>اسناد دانش‌نامه</h2><p>منابعی که در پاسخ‌گویی استفاده می‌شوند</p></div><div class="documents-actions"><button class="button button-quiet" id="documents-refresh" type="button">تازه‌سازی</button></div></div>
+          <p class="inline-error" id="dashboard-error" role="alert" hidden></p>
+          <div class="documents-list" id="documents-list"><p class="loading-state">در حال دریافت اسناد…</p></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    import { adminApi, ApiError } from "./static/api.js";
+
+    const KEY = "basalam-rag-admin-key";
+    const accepted = new Set(["txt", "pdf", "json"]);
+    const $ = selector => document.querySelector(selector);
+    const unlockScreen = $("#unlock-screen");
+    const adminShell = $("#admin-shell");
+    const unlockForm = $("#unlock-form");
+    const keyInput = $("#admin-key");
+    const unlockError = $("#unlock-error");
+    const dashboardError = $("#dashboard-error");
+    const documentsList = $("#documents-list");
+    const operationList = $("#operation-list");
+    const fileQueue = $("#file-queue");
+    const fileInput = $("#file-input");
+    const dropzone = $("#dropzone");
+    let token = sessionStorage.getItem(KEY) || "";
+    let busy = false;
+
+    const fa = value => Number(value || 0).toLocaleString("fa-IR");
+    const date = value => value ? new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+    const safeDetail = error => error instanceof ApiError ? error.message : "عملیات انجام نشد. دوباره تلاش کنید.";
+
+    function setDashboardError(message = "") { dashboardError.textContent = message; dashboardError.hidden = !message; }
+    function showPanel() { unlockScreen.hidden = true; adminShell.hidden = false; }
+    function showUnlock(message = "") { adminShell.hidden = true; unlockScreen.hidden = false; unlockError.textContent = message; unlockError.hidden = !message; keyInput.focus(); }
+    function logout() { sessionStorage.removeItem(KEY); token = ""; keyInput.value = ""; showUnlock(); }
+
+    function renderOperations(runs = []) {
+      operationList.replaceChildren();
+      if (!runs.length) { const empty = document.createElement("p"); empty.className = "loading-state"; empty.textContent = "هنوز عملیاتی ثبت نشده است."; operationList.append(empty); return; }
+      runs.slice(0, 8).forEach(run => {
+        const item = document.createElement("article"); item.className = `operation ${run.status === "failed" ? "error" : ""}`;
+        const icon = document.createElement("span"); icon.className = "operation-icon"; icon.textContent = run.status === "failed" ? "!" : "✓";
+        const content = document.createElement("div"); content.className = "operation-content";
+        const title = document.createElement("p"); title.className = "operation-title"; title.dir = "auto"; title.textContent = run.source_label || run.kind || "پردازش محتوا";
+        const detail = document.createElement("p"); detail.className = "operation-detail"; detail.textContent = run.error_message || `${fa(run.documents_processed)} سند و ${fa(run.chunks_created)} بخش · ${run.status === "succeeded" ? "موفق" : run.status}`;
+        content.append(title, detail);
+        const time = document.createElement("time"); time.className = "operation-time"; time.textContent = date(run.finished_at || run.created_at);
+        item.append(icon, content, time); operationList.append(item);
+      });
+    }
+
+    function renderDocuments(payload) {
+      const docs = Array.isArray(payload) ? payload : payload?.documents || [];
+      documentsList.replaceChildren();
+      if (!docs.length) {
+        const empty = document.createElement("div"); empty.className = "empty-state";
+        const text = document.createElement("div"); const title = document.createElement("strong"); title.textContent = "هنوز سندی وجود ندارد";
+        const help = document.createElement("p"); help.textContent = "یک فایل بارگذاری یا یک صفحه وب را crawl کنید."; text.append(title, help); empty.append(text); documentsList.append(empty); return;
+      }
+      docs.forEach(doc => {
+        const row = document.createElement("article"); row.className = "document-row";
+        const name = document.createElement("div"); name.className = "document-name"; const strong = document.createElement("strong"); strong.dir = "auto"; strong.textContent = doc.source_name || "بدون عنوان";
+        const sub = document.createElement("small"); sub.dir = "auto"; sub.textContent = doc.source_url || doc.content_hash?.slice(0, 16) || ""; name.append(strong, sub);
+        const type = document.createElement("span"); type.className = "document-type"; type.textContent = doc.source_type === "web" ? "وب" : "فایل";
+        const count = document.createElement("span"); count.className = "document-count"; count.textContent = `${fa(doc.chunk_count)} بخش`;
+        const updated = document.createElement("time"); updated.className = "document-date"; updated.textContent = date(doc.updated_at || doc.created_at);
+        row.append(name, type, count, updated); documentsList.append(row);
+      });
+    }
+
+    async function fetchDashboard() {
+      setDashboardError();
+      const [status, documents] = await Promise.all([adminApi.status(token), adminApi.documents(token)]);
+      $("#status-value").textContent = status.status === "ok" ? "آماده" : "نیازمند بررسی";
+      $("#system-status").textContent = status.status === "ok" ? "سامانه آماده است" : "نیازمند بررسی";
+      $("#documents-value").textContent = fa(status.active_documents);
+      $("#chunks-value").textContent = fa(status.indexed_chunks);
+      $("#providers-value").textContent = `${status.chat_provider || "—"} / ${status.embedding_provider || "—"}`;
+      renderOperations(status.recent_runs || []); renderDocuments(documents); showPanel();
+    }
+
+    async function loadDashboard() {
+      if (!token || busy) return;
+      busy = true;
+      try { await fetchDashboard(); }
+      catch (error) {
+        if (error instanceof ApiError && [401, 403].includes(error.status)) {
+          sessionStorage.removeItem(KEY); token = ""; keyInput.value = "";
+          showUnlock("کلید مدیریت معتبر نیست.");
+        } else setDashboardError(safeDetail(error));
+        throw error;
+      } finally { busy = false; }
+    }
+
+    unlockForm.addEventListener("submit", async event => {
+      event.preventDefault(); unlockError.hidden = true; token = keyInput.value.trim(); if (!token) return;
+      sessionStorage.setItem(KEY, token);
+      try { await loadDashboard(); }
+      catch (error) { if (token) showUnlock(safeDetail(error)); }
+    });
+    $("#logout-button").addEventListener("click", logout);
+    $("#refresh-button").addEventListener("click", () => loadDashboard().catch(() => {}));
+    $("#documents-refresh").addEventListener("click", () => loadDashboard().catch(() => {}));
+
+    $("#crawl-form").addEventListener("submit", async event => {
+      event.preventDefault(); const button = $("#crawl-button"); button.disabled = true; setDashboardError();
+      try {
+        const response = await adminApi.crawl(token, { url: $("#crawl-url").value.trim(), max_pages: Number($("#crawl-pages").value), max_depth: Number($("#crawl-depth").value) });
+        $("#crawl-url").value = ""; await fetchDashboard(); setDashboardError(`${fa(response.pages_visited)} صفحه پردازش شد.`);
+      } catch (error) { setDashboardError(safeDetail(error)); } finally { button.disabled = false; }
+    });
+
+    async function uploadFiles(files) {
+      const valid = [...files].filter(file => accepted.has(file.name.split(".").pop()?.toLowerCase()));
+      if (valid.length !== files.length) setDashboardError("فقط فایل‌های TXT، PDF و JSON مجاز هستند.");
+      fileQueue.replaceChildren();
+      for (const file of valid) {
+        const row = document.createElement("div"); row.className = "file-item"; const name = document.createElement("span"); name.className = "file-item-name"; name.dir = "auto"; name.textContent = file.name;
+        const state = document.createElement("span"); state.className = "file-item-state"; state.textContent = "در حال ارسال"; row.append(name, state); fileQueue.append(row);
+        try { const result = await adminApi.upload(token, file); state.textContent = result.unchanged ? "بدون تغییر" : `${fa(result.chunks_created)} بخش`; }
+        catch (error) { row.classList.add("error"); state.textContent = safeDetail(error); }
+      }
+      fileInput.value = ""; await fetchDashboard().catch(error => setDashboardError(safeDetail(error)));
+    }
+    dropzone.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => uploadFiles([...fileInput.files]));
+    dropzone.addEventListener("dragover", event => { event.preventDefault(); dropzone.classList.add("is-dragover"); });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("is-dragover"));
+    dropzone.addEventListener("drop", event => { event.preventDefault(); dropzone.classList.remove("is-dragover"); uploadFiles([...event.dataTransfer.files]); });
+
+    if (token) loadDashboard().catch(() => {}); else showUnlock();
+  </script>
+</body>
+</html>

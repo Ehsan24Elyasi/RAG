@@ -1,7 +1,35 @@
+# Environment and secrets
 .env
+.env.*
+!.env.example
+
+# Python
 .venv/
 __pycache__/
+*.py[cod]
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Backend runtime data
 app/data/chroma/
 app/data/processed/
-*.pyc
+app/data/runtime/
+app/data/runtime-*/
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+
+# Local tooling, generated artifacts, editors, and operating systems
+.claude/
+artifacts/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
