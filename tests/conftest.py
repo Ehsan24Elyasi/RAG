@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from app.config import Settings
+from app.llm.types import GenerationResult
 
 
 class FakeEmbeddingProvider:
@@ -23,9 +24,9 @@ class FakeChatProvider:
         self.response = response
         self.messages: list[list[dict[str, str]]] = []
 
-    def generate(self, messages: list[dict[str, str]]) -> str:
+    def generate(self, messages: list[dict[str, str]]) -> GenerationResult:
         self.messages.append(messages)
-        return self.response
+        return GenerationResult(text=self.response, model="test-chat", latency_ms=1)
 
 
 class FakeVectorStore:
@@ -61,6 +62,7 @@ def test_settings(tmp_path: Path) -> Settings:
         SQLITE_PATH=tmp_path / "rag.sqlite3",
         CHROMA_PERSIST_DIR=tmp_path / "chroma",
         ADMIN_API_KEY="test-admin-key",
+        WIDGET_TOKEN_SECRET="test-widget-secret-that-is-long-enough",
         CHAT_PROVIDER="ollama",
         CHAT_MODEL="test-chat",
         EMBEDDING_PROVIDER="sentence-transformers",

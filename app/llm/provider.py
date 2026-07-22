@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Protocol
 
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 
 from app.config import Settings
+from app.llm.types import GenerationResult, GenerationUsage
 
 
 class ChatProvider(Protocol):
-    def generate(self, messages: list[dict[str, str]]) -> str: ...
+    def generate(self, messages: list[dict[str, str]]) -> GenerationResult: ...
 
 
 class EmbeddingProvider(Protocol):
@@ -25,9 +27,24 @@ class OpenAICompatibleChatProvider:
         self.client = OpenAI(api_key=api_key or "local", base_url=base_url)
         self.model = model
 
-    def generate(self, messages: list[dict[str, str]]) -> str:
+    def generate(self, messages: list[dict[str, str]]) -> GenerationResult:
+        started = perf_counter()
         response = self.client.chat.completions.create(model=self.model, messages=messages, temperature=0)
-        return response.choices[0].message.content or ""
+        latency_ms = round((perf_counter() - started) * 1000)
+        choice = response.choices[0]
+        usage = getattr(response, "usage", None)
+        return GenerationResult(
+            text=choice.message.content or "",
+            model=str(getattr(response, "model", None) or self.model),
+            finish_reason=getattr(choice, "finish_reason", None),
+            usage=GenerationUsage(
+                prompt_tokens=getattr(usage, "prompt_tokens", None),
+                completion_tokens=getattr(usage, "completion_tokens", None),
+                total_tokens=getattr(usage, "total_tokens", None),
+            ),
+            provider_request_id=getattr(response, "id", None),
+            latency_ms=latency_ms,
+        )
 
 
 class SentenceTransformerEmbeddingProvider:

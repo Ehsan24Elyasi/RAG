@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Protocol
 
 from app.config import Settings
+from app.llm.types import GenerationResult
 from app.rag.prompting import build_messages
 from app.services.metadata import MetadataStore
 
@@ -19,7 +21,7 @@ _REFERENTIAL = re.compile(
 
 
 class ChatClient(Protocol):
-    def generate(self, messages: list[dict[str, str]]) -> str: ...
+    def generate(self, messages: list[dict[str, str]]) -> GenerationResult: ...
 
 
 class EmbeddingClient(Protocol):
@@ -28,6 +30,13 @@ class EmbeddingClient(Protocol):
 
 class VectorClient(Protocol):
     def query(self, query_embedding: list[float], top_k: int) -> dict: ...
+
+
+@dataclass(frozen=True)
+class ChatResult:
+    answer: str
+    sources: list[dict]
+    generation: GenerationResult | None = None
 
 
 def _history_aware_query(message: str, history: list[dict[str, str]]) -> str:
@@ -88,8 +97,12 @@ class ChatService:
         return None
 
     def answer(self, message: str, history: list[dict[str, str]], top_k: int) -> tuple[str, list[dict]]:
+        result = self.answer_detailed(message, history, top_k)
+        return result.answer, result.sources
+
+    def answer_detailed(self, message: str, history: list[dict[str, str]], top_k: int) -> ChatResult:
         if response := self._deterministic_response(message):
-            return response, []
+            return ChatResult(answer=response, sources=[])
         retrieval_query = _history_aware_query(message, history)
         query_vector = self.embeddings.embed([retrieval_query])
         if len(query_vector) != 1:
@@ -130,10 +143,10 @@ class ChatService:
             if len(contexts) >= top_k:
                 break
         if not contexts:
-            return self._unknown_response(message, history), []
+            return ChatResult(answer=self._unknown_response(message, history), sources=[])
 
         normalized_history = [(item["role"], item["content"]) for item in history if item.get("content")]
-        answer = self.chat.generate(
+        generation = self.chat.generate(
             build_messages(
                 message,
                 contexts,
@@ -141,9 +154,14 @@ class ChatService:
                 assistant_name=self.settings.assistant_name,
                 company_name=self.settings.company_name,
             )
-        ).strip()
+        )
+        answer = generation.text.strip()
         if not answer:
-            return self._unknown_response(message, history), []
+            return ChatResult(
+                answer=self._unknown_response(message, history),
+                sources=[],
+                generation=generation,
+            )
         cited_indexes = {int(match) - 1 for match in _CITATION.findall(answer)}
         cited_sources = [source for index, source in enumerate(sources) if index in cited_indexes]
-        return answer, cited_sources
+        return ChatResult(answer=answer, sources=cited_sources, generation=generation)

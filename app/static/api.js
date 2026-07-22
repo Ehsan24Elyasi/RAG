@@ -45,6 +45,24 @@ export const chatApi = (message, history, signal) => requestJson("/api/chat", {
   signal,
 });
 
+export const conversationApi = {
+  create: (token, title, signal) => requestJson("/api/conversations", {
+    method: "POST",
+    token,
+    body: title ? { title } : {},
+    signal,
+  }),
+  sendMessage: (token, conversationId, message, clientMessageId, signal) => requestJson(
+    `/api/conversations/${encodeURIComponent(conversationId)}/messages`,
+    {
+      method: "POST",
+      token,
+      body: { message, client_message_id: clientMessageId },
+      signal,
+    },
+  ),
+};
+
 export const configApi = (signal) => requestJson("/api/config", { signal });
 
 export const adminApi = {

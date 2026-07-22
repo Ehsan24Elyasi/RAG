@@ -62,6 +62,16 @@ class Settings(BaseSettings):
     admin_api_key: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("ADMIN_API_KEY", "ADMIN_TOKEN")
     )
+    server_conversations_enabled: bool = Field(
+        default=True, validation_alias="SERVER_CONVERSATIONS_ENABLED"
+    )
+    widget_token_secret: SecretStr | None = Field(default=None, validation_alias="WIDGET_TOKEN_SECRET")
+    widget_token_audience: str = Field(
+        default="rag-widget", validation_alias="WIDGET_TOKEN_AUDIENCE", min_length=1, max_length=100
+    )
+    widget_token_clock_skew_seconds: int = Field(
+        default=30, validation_alias="WIDGET_TOKEN_CLOCK_SKEW_SECONDS", ge=0, le=300
+    )
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=list, validation_alias=AliasChoices("CORS_ALLOWED_ORIGINS", "CORS_ORIGINS")
     )
@@ -82,6 +92,9 @@ class Settings(BaseSettings):
     )
     max_pdf_pages: int = Field(default=200, validation_alias="MAX_PDF_PAGES", ge=1, le=1_000)
     max_history_messages: int = Field(default=12, validation_alias="MAX_HISTORY_MESSAGES", ge=0, le=100)
+    generation_stale_after_seconds: int = Field(
+        default=600, validation_alias="GENERATION_STALE_AFTER_SECONDS", ge=60, le=86400
+    )
     max_message_chars: int = Field(
         default=4_000,
         validation_alias=AliasChoices("MAX_MESSAGE_CHARS", "MAX_QUESTION_CHARS"),
@@ -130,6 +143,12 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_API_KEY is required in production")
         if self.environment == "production" and not self.chat_api_key:
             raise ValueError("CHAT_API_KEY is required in production")
+        if (
+            self.environment == "production"
+            and self.server_conversations_enabled
+            and not self.widget_token_secret
+        ):
+            raise ValueError("WIDGET_TOKEN_SECRET is required when server conversations are enabled")
         if self.chat_provider not in {"openai", "ollama"} and not self.chat_base_url:
             raise ValueError("CHAT_BASE_URL is required for custom providers")
         return self

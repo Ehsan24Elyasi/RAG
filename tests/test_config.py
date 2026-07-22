@@ -33,6 +33,19 @@ def test_gapgpt_requires_api_key_in_production():
         )
 
 
+def test_production_server_conversations_require_widget_secret():
+    with pytest.raises(ValueError, match="WIDGET_TOKEN_SECRET"):
+        Settings(
+            _env_file=None,
+            APP_ENV="production",
+            ADMIN_API_KEY="admin-secret",
+            CHAT_PROVIDER="gapgpt",
+            CHAT_API_KEY="chat-secret",
+            CHAT_BASE_URL="https://api.gapgpt.app/v1",
+            WIDGET_TOKEN_SECRET=None,
+        )
+
+
 def test_custom_chat_provider_requires_base_url():
     with pytest.raises(ValueError, match="CHAT_BASE_URL"):
         Settings(

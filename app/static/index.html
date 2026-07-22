@@ -2,8 +2,8 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#13795b">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b6b50">
   <meta name="description" content="پاسخ‌گویی سریع و دقیق به پرسش‌های شما">
   <title>پاسخ‌یار | پشتیبانی هوشمند</title>
   <link rel="icon" href="./static/favicon.svg" type="image/svg+xml">
@@ -22,23 +22,29 @@
     <main class="landing-main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-content">
-          <p class="eyebrow">همیشه در دسترس شما</p>
-          <h1 id="hero-title">پاسخ پرسش‌هایتان، <strong>سریع و با استناد</strong></h1>
-          <p class="hero-text">پاسخ‌یار در منابع معتبر جست‌وجو می‌کند تا بتوانید پاسخ موردنیازتان را همراه با منبع آن پیدا کنید.</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>همیشه در دسترس شما</p>
+          <h1 id="hero-title">پاسخ پرسش‌هایتان، <strong>سریع و مستند</strong></h1>
+          <p class="hero-text">پاسخ‌یار در منابع معتبر جست‌وجو می‌کند تا پاسخ موردنیازتان را شفاف، روان و همراه با منبع پیدا کنید.</p>
           <div class="hero-actions">
             <button class="button button-primary" type="button" id="hero-chat-button">
               گفت‌وگو را شروع کنید
               <svg class="icon" aria-hidden="true"><use href="#icon-arrow"></use></svg>
             </button>
-            <a class="button button-secondary" href="#features">بیشتر بدانید</a>
+            <a class="button button-secondary" href="#features">چطور کار می‌کند؟</a>
           </div>
+          <ul class="hero-trust" aria-label="ویژگی‌های پاسخ‌یار">
+            <li>پاسخ بر پایهٔ دانش‌نامه</li>
+            <li>نمایش منبع پاسخ</li>
+            <li>پشتیبانی از فارسی</li>
+          </ul>
         </div>
         <div class="hero-visual" aria-hidden="true">
           <div class="hero-orb"></div>
           <div class="ask-card">
-            <div class="ask-card-header"><span class="ask-card-avatar">پ</span>پاسخ‌یار</div>
+            <div class="ask-card-header"><span class="ask-card-avatar">پ</span>پاسخ‌یار <span class="online-dot"></span></div>
             <p class="sample-question">شرایط ارسال سفارش چیست؟</p>
             <div class="sample-answer">جزئیات شرایط ارسال در صفحهٔ راهنمای سفارش‌ها آمده است.<div class="sample-line"></div><div class="sample-line short"></div></div>
+            <div class="sample-source">منبع: راهنمای سفارش‌ها</div>
           </div>
           <span class="floating-pill">پاسخ همراه با منبع</span>
         </div>
@@ -48,6 +54,7 @@
     <section class="features" id="features" aria-labelledby="features-title">
       <div class="landing-main">
         <div class="section-heading">
+          <p class="eyebrow">ساده، شفاف و قابل بررسی</p>
           <h2 id="features-title">کمک گرفتن، بدون پیچیدگی</h2>
           <p>سؤال خود را به زبان طبیعی بنویسید؛ پاسخ‌یار در اسناد و صفحات ثبت‌شده به دنبال پاسخ می‌گردد.</p>
         </div>
@@ -56,13 +63,13 @@
             <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg></div>
             <h3>جست‌وجوی متمرکز</h3><p>پاسخ‌ها بر اساس محتوای مرتبط دانش‌نامه تهیه می‌شوند.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card featured">
             <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#icon-book"></use></svg></div>
             <h3>منابع قابل بررسی</h3><p>در هر پاسخ، منابع استفاده‌شده را برای بررسی بیشتر ببینید.</p>
           </article>
           <article class="feature-card">
             <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
-            <h3>گفت‌وگوی خصوصی</h3><p>تاریخچهٔ کوتاه گفت‌وگو فقط در مرورگر شما نگه‌داری می‌شود.</p>
+            <h3>گفت‌وگوی پیوسته</h3><p>در حالت احراز هویت‌شده، ادامهٔ گفتگو برای پاسخ‌های مرتبط‌تر در سرور نگه‌داری می‌شود.</p>
           </article>
         </div>
       </div>
@@ -72,15 +79,16 @@
 
   <button class="chat-launcher" id="chat-launcher" type="button" aria-label="باز کردن گفت‌وگوی پشتیبانی" aria-expanded="false" aria-controls="chat-panel">
     <svg class="icon" aria-hidden="true"><use href="#icon-chat"></use></svg>
+    <span class="launcher-pulse" aria-hidden="true"></span>
   </button>
 
   <section class="chat-panel" id="chat-panel" role="dialog" aria-modal="true" aria-labelledby="chat-title" aria-hidden="true">
     <header class="chat-topbar">
       <div class="chat-agent">
-        <span class="chat-agent-mark" aria-hidden="true">پ</span>
-        <span><strong id="chat-title">پاسخ‌یار</strong><small>پرسش خود را بنویسید</small></span>
+        <span class="chat-agent-mark" aria-hidden="true">پ<span></span></span>
+        <span><strong id="chat-title">پاسخ‌یار</strong><small>پاسخ بر پایهٔ منابع معتبر</small></span>
       </div>
-      <button class="button button-quiet" id="chat-reset" type="button" title="شروع گفت‌وگوی جدید" aria-label="پاک کردن گفت‌وگو و شروع مجدد">
+      <button class="button button-quiet" id="chat-reset" type="button" title="شروع گفت‌وگوی تازه" aria-label="شروع گفت‌وگوی تازه">
         <svg class="icon" aria-hidden="true"><use href="#icon-reset"></use></svg>
       </button>
       <button class="button button-quiet" id="chat-close" type="button" title="بستن" aria-label="بستن گفت‌وگو">
@@ -88,21 +96,26 @@
       </button>
     </header>
     <div class="chat-content">
-      <div class="chat-messages" id="chat-messages" aria-live="polite" aria-relevant="additions text">
-        <div class="chat-welcome" id="chat-welcome"><strong>سلام، خوش آمدید.</strong><br>برای کمک، سؤال خود را بنویسید. پاسخ‌ها بر پایهٔ منابع ثبت‌شده ارائه می‌شوند.</div>
+      <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-relevant="additions">
+        <div class="chat-welcome" id="chat-welcome">
+          <div class="welcome-mark" aria-hidden="true"><svg class="icon"><use href="#icon-spark"></use></svg></div>
+          <div class="chat-welcome-copy"><strong>سلام، خوش آمدید.</strong><br>سؤال خود را بنویسید تا پاسخ را بر پایهٔ منابع ثبت‌شده پیدا کنم.</div>
+          <div class="welcome-note"><svg class="icon" aria-hidden="true"><use href="#icon-book"></use></svg>منابع استفاده‌شده زیر پاسخ نمایش داده می‌شوند.</div>
+        </div>
       </div>
       <form class="chat-form" id="chat-form">
         <label class="sr-only" for="chat-input">پیام شما</label>
         <div class="chat-compose">
-          <textarea id="chat-input" name="message" dir="auto" rows="1" maxlength="20000" placeholder="سؤال خود را بنویسید…" autocomplete="off"></textarea>
+          <textarea id="chat-input" name="message" dir="auto" rows="1" maxlength="20000" placeholder="سؤال خود را بنویسید…" autocomplete="off" enterkeyhint="send"></textarea>
           <button class="chat-send" id="chat-send" type="submit" aria-label="ارسال پیام" title="ارسال پیام">
             <svg class="icon" aria-hidden="true"><use href="#icon-send"></use></svg>
           </button>
         </div>
-        <div class="chat-hint"><span>برای ارسال، Enter را بزنید</span><span id="char-count">۰/۲۰٬۰۰۰</span></div>
+        <div class="chat-hint"><span>Enter برای ارسال · Shift+Enter برای خط جدید</span><span id="char-count">۰/۲۰٬۰۰۰</span></div>
       </form>
     </div>
   </section>
+  <p class="sr-only" id="chat-status" role="status" aria-live="polite" aria-atomic="true"></p>
 
   <svg width="0" height="0" class="sr-only" aria-hidden="true" focusable="false">
     <symbol id="icon-chat" viewBox="0 0 24 24"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.48 8.6 8.6 0 0 1-3.86-.95L4 19l1.1-3.15A7.34 7.34 0 0 1 4 12c0-4.14 3.58-7.5 8-7.5s8 3.36 8 7.5Z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></symbol>
@@ -113,254 +126,9 @@
     <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.3-4.3"/></symbol>
     <symbol id="icon-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z"/><path d="M4 19h16"/></symbol>
     <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6l8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-4.8"/></symbol>
+    <symbol id="icon-spark" viewBox="0 0 24 24"><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z"/><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"/></symbol>
   </svg>
 
-  <script type="module">
-    import { chatApi, configApi, ApiError } from "./static/api.js";
-
-    const STORAGE_KEY = "basalam-rag-chat-v1";
-    const MAX_STORED_MESSAGES = 20;
-    const MAX_HISTORY_MESSAGES = 12;
-    const panel = document.querySelector("#chat-panel");
-    const launcher = document.querySelector("#chat-launcher");
-    const closeButton = document.querySelector("#chat-close");
-    const resetButton = document.querySelector("#chat-reset");
-    const heroButton = document.querySelector("#hero-chat-button");
-    const form = document.querySelector("#chat-form");
-    const input = document.querySelector("#chat-input");
-    const messages = document.querySelector("#chat-messages");
-    const welcome = document.querySelector("#chat-welcome");
-    const sendButton = document.querySelector("#chat-send");
-    const charCount = document.querySelector("#char-count");
-    panel.inert = true;
-    let storedMessages = readMessages();
-    let lastFocusedElement = null;
-    let pendingMessage = null;
-    let requestController = null;
-
-    const toPersianNumber = (value) => Number(value).toLocaleString("fa-IR");
-    function formatTime(iso) { return new Intl.DateTimeFormat("fa-IR", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso)); }
-    function createMessageId() {
-      return `m-${Date.now().toString(36)}-${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
-    }
-    function readMessages() {
-      try {
-        const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-        if (!Array.isArray(value)) return [];
-        return value.filter(item => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string")
-          .slice(-MAX_STORED_MESSAGES)
-          .map(item => ({ ...item, id: typeof item.id === "string" && item.id ? item.id : createMessageId(), createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(), sources: Array.isArray(item.sources) ? item.sources : [] }));
-      } catch { return []; }
-    }
-    function saveMessages() {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(storedMessages.slice(-MAX_STORED_MESSAGES))); } catch { /* Storage availability must not prevent chatting. */ }
-    }
-    function scrollToEnd() { messages.scrollTop = messages.scrollHeight; }
-    const SOURCE_TYPE_LABELS = { web: "صفحهٔ وب", website: "صفحهٔ وب", url: "صفحهٔ وب", upload: "فایل بارگذاری‌شده", pdf: "فایل PDF", document: "سند", file: "فایل", text: "متن", faq: "پرسش‌های متداول" };
-    function sourceTypeLabel(value) {
-      const key = String(value || "").trim().toLowerCase();
-      return SOURCE_TYPE_LABELS[key] || (key ? "سند" : "منبع");
-    }
-    function normalizedSourceId(source, fallbackIndex) {
-      return /^S[1-9]\d*$/.test(String(source?.id || "")) ? String(source.id) : `S${fallbackIndex + 1}`;
-    }
-    function sourceTargetId(messageId, sourceId) { return `source-${messageId}-${sourceId}`; }
-    function createCitation(messageId, source) {
-      const sourceId = normalizedSourceId(source, 0);
-      const citation = document.createElement("button");
-      citation.type = "button"; citation.className = "citation-chip"; citation.textContent = `[${sourceId}]`;
-      citation.setAttribute("aria-label", `نمایش منبع ${sourceId}`);
-      citation.addEventListener("click", () => {
-        const target = document.getElementById(sourceTargetId(messageId, sourceId));
-        const details = target?.closest("details");
-        if (details) details.open = true;
-        target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        target?.focus({ preventScroll: true });
-      });
-      return citation;
-    }
-    function appendInlineText(parent, text, messageId, sources) {
-      const pattern = /(\*\*([^*\n]+)\*\*|__([^_\n]+)__|`([^`\n]+)`|\*([^*\n]+)\*|_([^_\n]+)_|\[S(\d+)\])/g;
-      let cursor = 0; let match;
-      while ((match = pattern.exec(text))) {
-        if (match.index > cursor) parent.append(document.createTextNode(text.slice(cursor, match.index)));
-        if (match[2] || match[3]) {
-          const strong = document.createElement("strong"); strong.textContent = match[2] || match[3]; parent.append(strong);
-        } else if (match[4]) {
-          const code = document.createElement("code"); code.textContent = match[4]; parent.append(code);
-        } else if (match[5] || match[6]) {
-          const emphasis = document.createElement("em"); emphasis.textContent = match[5] || match[6]; parent.append(emphasis);
-        } else {
-          const sourceId = `S${Number(match[7])}`;
-          const source = sources.find((item, index) => normalizedSourceId(item, index) === sourceId);
-          parent.append(source ? createCitation(messageId, source) : document.createTextNode(match[0]));
-        }
-        cursor = pattern.lastIndex;
-      }
-      if (cursor < text.length) parent.append(document.createTextNode(text.slice(cursor)));
-    }
-    function renderAssistantContent(bubble, content, messageId, sources) {
-      const lines = String(content).replace(/\r\n?/g, "\n").split("\n"); let index = 0;
-      while (index < lines.length) {
-        if (!lines[index].trim()) { index += 1; continue; }
-        const listMatch = lines[index].match(/^\s*([-*•])\s+(.+)$/) || lines[index].match(/^\s*(\d+)[.)]\s+(.+)$/);
-        if (listMatch) {
-          const ordered = /^\s*\d+[.)]\s+/.test(lines[index]); const list = document.createElement(ordered ? "ol" : "ul");
-          while (index < lines.length) {
-            const match = ordered ? lines[index].match(/^\s*\d+[.)]\s+(.+)$/) : lines[index].match(/^\s*[-*•]\s+(.+)$/);
-            if (!match) break;
-            const li = document.createElement("li"); appendInlineText(li, match[1], messageId, sources); list.append(li); index += 1;
-          }
-          bubble.append(list); continue;
-        }
-        if (/^\s*(?:\*\*[^*]+\*\*|__[^_]+__)\s*[:：]/.test(lines[index])) {
-          const detail = document.createElement("p"); detail.className = "answer-detail";
-          appendInlineText(detail, lines[index].trim(), messageId, sources); bubble.append(detail); index += 1; continue;
-        }
-        const paragraph = document.createElement("p"); const paragraphLines = [];
-        while (index < lines.length && lines[index].trim() && !lines[index].match(/^\s*(?:[-*•]\s+|\d+[.)]\s+)/)) { paragraphLines.push(lines[index].trim()); index += 1; }
-        appendInlineText(paragraph, paragraphLines.join(" "), messageId, sources); bubble.append(paragraph);
-      }
-      if (!bubble.children.length) bubble.textContent = String(content);
-    }
-    function createMessage(message) {
-      const item = document.createElement("article"); item.className = `message ${message.role}`; item.dataset.messageId = message.id;
-      const bubble = document.createElement("div"); bubble.className = "message-bubble"; bubble.dir = "auto";
-      if (message.role === "assistant") renderAssistantContent(bubble, message.content, message.id, message.sources || []); else bubble.textContent = message.content;
-      item.append(bubble);
-      if (message.role === "assistant" && message.sources?.length) item.append(createSources(message.sources, message.id));
-      const meta = document.createElement("time"); meta.className = "message-meta"; meta.dateTime = message.createdAt; meta.textContent = formatTime(meta.dateTime); item.append(meta);
-      return item;
-    }
-    function createSources(sources, messageId) {
-      const details = document.createElement("details"); details.className = "message-sources";
-      const summary = document.createElement("summary"); summary.textContent = `منابع پاسخ (${toPersianNumber(sources.length)})`;
-      const list = document.createElement("ol"); list.className = "source-list";
-      sources.slice(0, 8).forEach((source, index) => {
-        const sourceId = normalizedSourceId(source, index);
-        const li = document.createElement("li"); li.id = sourceTargetId(messageId, sourceId); li.tabIndex = -1;
-        const tag = document.createElement("span"); tag.className = "source-tag"; tag.textContent = `[${sourceId}]`;
-        const title = String(source?.title || source?.source_name || `منبع ${toPersianNumber(index + 1)}`);
-        li.append(tag, document.createTextNode(" "));
-        if (typeof source?.url === "string" && /^https?:\/\//i.test(source.url)) { const link = document.createElement("a"); link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = title; li.append(link); } else li.append(document.createTextNode(title));
-        const parts = [sourceTypeLabel(source?.source_type), Number.isFinite(Number(source?.chunk_index)) ? `بخش ${toPersianNumber(Number(source.chunk_index) + 1)}` : null].filter(Boolean);
-        const note = document.createElement("span"); note.className = "source-descriptor"; note.textContent = ` (${parts.join(" · ")})`; li.append(note); list.append(li);
-      });
-      details.append(summary, list); return details;
-    }
-    function renderSavedMessages() {
-      welcome.hidden = storedMessages.length > 0;
-      storedMessages.forEach(message => messages.append(createMessage(message)));
-      scrollToEnd();
-    }
-    function setOpen(open) {
-      if (open) {
-        lastFocusedElement = document.activeElement;
-        panel.classList.add("is-open"); panel.setAttribute("aria-hidden", "false"); launcher.dataset.open = "true";
-        panel.inert = false; document.body.classList.add("chat-is-open");
-        launcher.setAttribute("aria-expanded", "true"); launcher.setAttribute("aria-label", launcher.dataset.closeLabel || "بستن گفت‌وگو");
-        window.setTimeout(() => input.focus(), 100);
-      } else {
-        panel.classList.remove("is-open"); panel.setAttribute("aria-hidden", "true"); launcher.dataset.open = "false";
-        panel.inert = true; document.body.classList.remove("chat-is-open");
-        launcher.setAttribute("aria-expanded", "false"); launcher.setAttribute("aria-label", launcher.dataset.openLabel || "باز کردن گفت‌وگو");
-        if (lastFocusedElement instanceof HTMLElement) lastFocusedElement.focus(); else launcher.focus();
-      }
-    }
-    function setBusy(busy) {
-      input.disabled = busy; sendButton.disabled = busy;
-      form.setAttribute("aria-busy", String(busy));
-    }
-    function showLoading() {
-      const node = document.createElement("div"); node.className = "chat-loading"; node.id = "chat-loading";
-      const text = document.createElement("span"); text.textContent = "در حال یافتن پاسخ";
-      const dots = document.createElement("span"); dots.className = "loading-dots"; dots.setAttribute("aria-hidden", "true");
-      dots.append(document.createElement("span"), document.createElement("span"), document.createElement("span"));
-      node.append(text, dots); messages.append(node); scrollToEnd();
-    }
-    function clearTransient() { document.querySelector("#chat-loading")?.remove(); document.querySelector("#chat-error")?.remove(); }
-    function showError(text) {
-      const node = document.createElement("div"); node.id = "chat-error"; node.className = "chat-error"; node.setAttribute("role", "alert");
-      const label = document.createElement("span"); label.textContent = text;
-      const retry = document.createElement("button"); retry.className = "button"; retry.type = "button"; retry.textContent = "تلاش مجدد";
-      retry.addEventListener("click", () => { if (pendingMessage) requestAnswer(pendingMessage); });
-      node.append(label, retry); messages.append(node); scrollToEnd();
-    }
-    function resizeInput() { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 115)}px`; }
-    function updateCharCount() { charCount.textContent = `${toPersianNumber(input.value.length)}/۲۰٬۰۰۰`; }
-    function configText(value, fallback) { return typeof value === "string" && value.trim() ? value.trim().slice(0, 240) : fallback; }
-    function applyConfig(payload) {
-      const config = payload && typeof payload === "object" && payload.config && typeof payload.config === "object" ? payload.config : (payload || {});
-      const assistant = configText(config.assistant_name || config.assistantName || config.assistant?.name, "پاسخ‌یار");
-      const company = configText(config.company_name || config.companyName || config.company?.name, "پشتیبانی هوشمند");
-      const title = configText(config.page_title || config.pageTitle || config.title, `${assistant} | ${company}`);
-      const greeting = configText(config.greeting || config.welcome_message || config.welcomeMessage, "سلام، خوش آمدید.\nبرای کمک، سؤال خود را بنویسید. پاسخ‌ها بر پایهٔ منابع ثبت‌شده ارائه می‌شوند.");
-      document.title = title;
-      document.querySelectorAll(".brand > span:last-child").forEach(node => { node.firstChild.nodeValue = assistant; const small = node.querySelector("small"); if (small) small.textContent = company; });
-      document.querySelector("#chat-title").textContent = assistant;
-      document.querySelector(".chat-agent small").textContent = configText(config.chat_subtitle || config.chatSubtitle, "پرسش خود را بنویسید");
-      document.querySelector(".ask-card-header").lastChild.nodeValue = assistant;
-      welcome.replaceChildren(); greeting.split("\n").forEach((line, index) => { if (index) welcome.append(document.createElement("br")); const node = index === 0 ? document.createElement("strong") : document.createTextNode(line); node.textContent = line; welcome.append(node); });
-      const launcherLabel = configText(config.launcher_aria_label || config.launcherAriaLabel, `باز کردن گفت‌وگوی ${assistant}`);
-      launcher.setAttribute("aria-label", launcherLabel); launcher.dataset.openLabel = launcherLabel; launcher.dataset.closeLabel = configText(config.close_launcher_aria_label || config.closeLauncherAriaLabel, `بستن گفت‌وگوی ${assistant}`);
-      closeButton.setAttribute("aria-label", configText(config.close_aria_label || config.closeAriaLabel, "بستن گفت‌وگو"));
-      resetButton.setAttribute("aria-label", configText(config.reset_aria_label || config.resetAriaLabel, "پاک کردن گفت‌وگو و شروع مجدد"));
-      input.setAttribute("aria-label", configText(config.input_aria_label || config.inputAriaLabel, "پیام شما"));
-      input.placeholder = configText(config.input_placeholder || config.inputPlaceholder, "سؤال خود را بنویسید…");
-      sendButton.setAttribute("aria-label", configText(config.send_aria_label || config.sendAriaLabel, "ارسال پیام"));
-    }
-    async function loadConfig() { try { applyConfig(await configApi()); } catch { /* Default copy remains available when configuration is unavailable. */ } }
-    function appendNewMessage(rawMessage) {
-      const content = rawMessage.trim(); if (!content) return null;
-      const userEntry = { id: createMessageId(), role: "user", content, createdAt: new Date().toISOString() };
-      storedMessages.push(userEntry); storedMessages = storedMessages.slice(-MAX_STORED_MESSAGES); saveMessages();
-      welcome.hidden = true; messages.append(createMessage(userEntry)); input.value = ""; resizeInput(); updateCharCount();
-      return { userId: userEntry.id, content, history: storedMessages.slice(0, -1).slice(-MAX_HISTORY_MESSAGES).map(({ role, content: priorContent }) => ({ role, content: priorContent })) };
-    }
-    async function requestAnswer(request) {
-      if (!request || requestController) return;
-      clearTransient(); pendingMessage = request; const controller = new AbortController(); requestController = controller; setBusy(true); showLoading();
-      try {
-        const response = await chatApi(request.content, request.history, controller.signal);
-        if (requestController !== controller || !storedMessages.some(item => item.id === request.userId)) return;
-        clearTransient();
-        const answer = typeof response?.answer === "string" ? response.answer : "پاسخی از سرویس دریافت نشد.";
-        const sources = Array.isArray(response?.sources) ? response.sources.slice(0, 8).map(source => ({ id: source?.id, document_id: source?.document_id, title: source?.title, source_name: source?.source_name, source_type: source?.source_type, url: source?.url, chunk_index: source?.chunk_index })) : [];
-        const assistantEntry = { id: createMessageId(), role: "assistant", content: answer, sources, createdAt: new Date().toISOString() };
-        storedMessages.push(assistantEntry); storedMessages = storedMessages.slice(-MAX_STORED_MESSAGES); saveMessages(); messages.append(createMessage(assistantEntry)); scrollToEnd(); pendingMessage = null;
-      } catch (error) {
-        if (requestController !== controller) return;
-        clearTransient(); if (error?.name !== "AbortError") showError(error instanceof ApiError ? error.message : "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.");
-      } finally {
-        if (requestController === controller) { requestController = null; setBusy(false); input.focus(); }
-      }
-    }
-    function sendMessage(rawMessage) {
-      if (requestController) return;
-      const request = appendNewMessage(rawMessage); if (request) requestAnswer(request);
-    }
-    launcher.addEventListener("click", () => setOpen(!panel.classList.contains("is-open")));
-    closeButton.addEventListener("click", () => setOpen(false));
-    heroButton.addEventListener("click", () => setOpen(true));
-    resetButton.addEventListener("click", () => {
-      if (!window.confirm("گفت‌وگوی فعلی پاک شود؟")) return;
-      requestController?.abort(); requestController = null; pendingMessage = null; storedMessages = []; saveMessages(); clearTransient(); setBusy(false);
-      [...messages.children].forEach(child => { if (child !== welcome) child.remove(); }); welcome.hidden = false; input.focus();
-    });
-    form.addEventListener("submit", event => { event.preventDefault(); sendMessage(input.value); });
-    input.addEventListener("input", () => { resizeInput(); updateCharCount(); });
-    input.addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); } });
-    document.addEventListener("keydown", event => {
-      if (event.key === "Escape" && panel.classList.contains("is-open")) { event.preventDefault(); setOpen(false); }
-      if (event.key === "Tab" && panel.classList.contains("is-open")) {
-        const focusable = [...panel.querySelectorAll('button:not([disabled]), textarea:not([disabled]), [href], summary')].filter(el => !el.hidden);
-        if (!focusable.length) return;
-        const first = focusable[0], last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-      }
-    });
-    renderSavedMessages(); saveMessages(); resizeInput(); updateCharCount(); loadConfig();
-  </script>
+  <script type="module" src="./static/widget.js"></script>
 </body>
 </html>

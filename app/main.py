@@ -15,11 +15,17 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import Settings, get_settings
 from app.llm.provider import ChatProvider, EmbeddingProvider, create_chat_provider, create_embedding_provider
+from app.observability import request_context_middleware
 from app.rag.vectorstore import VectorStore
 from app.schemas import (
     AdminStatusResponse,
     ChatRequest,
     ChatResponse,
+    ConversationCreateRequest,
+    ConversationMessageRequest,
+    ConversationMessageResponse,
+    ConversationResponse,
+    ConversationsResponse,
     CrawlRequest,
     CrawlResponse,
     DocumentResponse,
@@ -29,10 +35,11 @@ from app.schemas import (
     IngestResponse,
     PublicConfigResponse,
 )
+from app.security import WidgetIdentity, WidgetTokenError, verify_widget_token
 from app.services.chat import ChatService
 from app.services.crawler import CrawlError, WebCrawler
 from app.services.documents import DocumentService, IngestedDocument
-from app.services.metadata import IngestionRun, MetadataStore
+from app.services.metadata import IngestionRun, MetadataStore, User
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -46,6 +53,12 @@ class Runtime:
     crawler: WebCrawler
     vectors: VectorStore
     ingestion_lock: threading.Lock
+
+
+@dataclass(frozen=True)
+class WidgetPrincipal:
+    identity: WidgetIdentity
+    user: User
 
 
 def _http_error(status_code: int, detail: str) -> HTTPException:
@@ -67,6 +80,17 @@ def _ingest_response(document: IngestedDocument, run_id: str) -> IngestResponse:
     )
 
 
+def _conversation_response(conversation) -> ConversationResponse:
+    return ConversationResponse(
+        id=conversation.id,
+        title=conversation.title,
+        status=conversation.status,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        last_message_at=conversation.last_message_at,
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     *,
@@ -82,6 +106,7 @@ def create_app(
         configured.data_dir.mkdir(parents=True, exist_ok=True)
         metadata = MetadataStore(configured.metadata_db_path)
         metadata.initialize()
+        metadata.recover_stale_generating_messages(configured.generation_stale_after_seconds)
         vectors = vector_store or VectorStore(
             str(configured.chroma_persist_dir),
             configured.chroma_collection_name,
@@ -114,6 +139,7 @@ def create_app(
         yield
 
     api = FastAPI(title=configured.app_name, lifespan=lifespan)
+    api.middleware("http")(request_context_middleware)
     if configured.cors_allowed_origins:
         api.add_middleware(
             CORSMiddleware,
@@ -141,6 +167,36 @@ def create_app(
         expected = f"Bearer {secret.get_secret_value()}"
         if not hmac.compare_digest(request.headers.get("Authorization", ""), expected):
             raise _http_error(401, "Authentication required.")
+
+    def require_widget_user(
+        request: Request, active: Runtime = Depends(runtime)
+    ) -> WidgetPrincipal:
+        if not active.settings.server_conversations_enabled:
+            raise _http_error(404, "Server conversations are not enabled.")
+        secret = active.settings.widget_token_secret
+        if not secret:
+            raise _http_error(503, "Widget authentication is not configured.")
+        authorization = request.headers.get("Authorization", "")
+        if not authorization.startswith("Bearer "):
+            raise _http_error(401, "Widget authentication required.")
+        try:
+            identity = verify_widget_token(
+                authorization.removeprefix("Bearer ").strip(),
+                secret.get_secret_value(),
+                audience=active.settings.widget_token_audience,
+                clock_skew_seconds=active.settings.widget_token_clock_skew_seconds,
+            )
+        except WidgetTokenError:
+            raise _http_error(401, "Invalid or expired widget token.") from None
+        if active.metadata.workspace(identity.workspace_id) is None:
+            raise _http_error(401, "Invalid widget workspace.")
+        user = active.metadata.upsert_user(
+            identity.workspace_id,
+            identity.external_user_id,
+            display_name=identity.display_name,
+            email=identity.email,
+        )
+        return WidgetPrincipal(identity=identity, user=user)
 
     @api.get("/healthz", response_model=HealthResponse)
     def healthz() -> HealthResponse:
@@ -170,6 +226,164 @@ def create_app(
         except Exception:
             raise _http_error(503, "The language service is temporarily unavailable.") from None
         return ChatResponse(answer=answer, sources=sources)
+
+    @api.post("/api/conversations", response_model=ConversationResponse, status_code=201)
+    def create_conversation(
+        request_body: ConversationCreateRequest,
+        principal: WidgetPrincipal = Depends(require_widget_user),
+        active: Runtime = Depends(runtime),
+    ) -> ConversationResponse:
+        conversation = active.metadata.create_conversation(
+            principal.identity.workspace_id,
+            principal.user.id,
+            title=request_body.title,
+        )
+        return _conversation_response(conversation)
+
+    @api.get("/api/conversations", response_model=ConversationsResponse)
+    def list_conversations(
+        principal: WidgetPrincipal = Depends(require_widget_user),
+        active: Runtime = Depends(runtime),
+    ) -> ConversationsResponse:
+        conversations = active.metadata.list_authorized_conversations(
+            principal.identity.workspace_id,
+            principal.user.id,
+        )
+        return ConversationsResponse(
+            conversations=[_conversation_response(item) for item in conversations]
+        )
+
+    @api.post(
+        "/api/conversations/{conversation_id}/messages",
+        response_model=ConversationMessageResponse,
+    )
+    def create_conversation_message(
+        conversation_id: str,
+        request_body: ConversationMessageRequest,
+        request: Request,
+        principal: WidgetPrincipal = Depends(require_widget_user),
+        active: Runtime = Depends(runtime),
+    ) -> ConversationMessageResponse:
+        if len(request_body.message) > active.settings.max_message_chars:
+            raise _http_error(422, "The message exceeds the configured limit.")
+        workspace_id = principal.identity.workspace_id
+        conversation = active.metadata.get_conversation(
+            workspace_id,
+            conversation_id,
+            user_id=principal.user.id,
+        )
+        if conversation is None:
+            raise _http_error(404, "Conversation not found.")
+        user_message = active.metadata.append_user_message(
+            workspace_id,
+            conversation_id,
+            principal.user.id,
+            request_body.message,
+            client_message_id=request_body.client_message_id,
+        )
+        assistant_message, claimed = active.metadata.claim_assistant_placeholder(
+            workspace_id,
+            conversation_id,
+            user_id=principal.user.id,
+            parent_message_id=user_message.id,
+        )
+        if assistant_message.status == "completed" and assistant_message.content is not None:
+            citations = active.metadata.citations_for_message(workspace_id, assistant_message.id)
+            return ConversationMessageResponse(
+                conversation_id=conversation_id,
+                user_message_id=user_message.id,
+                assistant_message_id=assistant_message.id,
+                answer=assistant_message.content,
+                sources=[
+                    {
+                        "id": (item.metadata or {}).get("source_id", f"S{item.position + 1}"),
+                        "document_id": item.document_id or "",
+                        "title": item.source_name or "Support document",
+                        "source_type": (item.metadata or {}).get("source_type", "upload"),
+                        "url": item.source_url,
+                        "chunk_index": (item.metadata or {}).get("chunk_index", 0),
+                    }
+                    for item in citations
+                    if item.document_id
+                ],
+            )
+        if not claimed:
+            raise _http_error(409, "This message is already being processed or requires a new retry ID.")
+        persisted_history = active.metadata.load_conversation_history(
+            workspace_id,
+            conversation_id,
+            user_id=principal.user.id,
+            limit=active.settings.max_history_messages + 2,
+        )
+        history = [
+            {"role": item.role, "content": item.content}
+            for item in persisted_history
+            if item.id not in {user_message.id, assistant_message.id}
+            and item.role in {"user", "assistant"}
+            and item.status == "completed"
+            and item.content
+        ][-active.settings.max_history_messages :]
+        try:
+            result = active.chat.answer_detailed(
+                request_body.message,
+                history,
+                active.settings.top_k,
+            )
+            active.metadata.complete_assistant_message(
+                workspace_id,
+                assistant_message.id,
+                result.answer,
+            )
+            active.metadata.record_citations(
+                workspace_id,
+                assistant_message.id,
+                [
+                    {
+                        "document_id": source.get("document_id"),
+                        "source_name": source.get("title"),
+                        "source_url": source.get("url"),
+                        "metadata": {
+                            "source_id": source.get("id"),
+                            "source_type": source.get("source_type"),
+                            "chunk_index": source.get("chunk_index"),
+                        },
+                    }
+                    for source in result.sources
+                ],
+            )
+            generation = result.generation
+            active.metadata.record_generation_usage(
+                workspace_id,
+                conversation_id,
+                assistant_message.id,
+                status="completed",
+                provider=active.settings.chat_provider if generation else "local",
+                model=generation.model if generation else None,
+                prompt_tokens=generation.usage.prompt_tokens if generation else None,
+                completion_tokens=generation.usage.completion_tokens if generation else None,
+                total_tokens=generation.usage.total_tokens if generation else None,
+                latency_ms=generation.latency_ms if generation else 0,
+                finish_reason=generation.finish_reason if generation else "deterministic",
+                request_id=request.state.request_id,
+                metadata={
+                    "context_count": len(result.sources),
+                    "provider_request_id": generation.provider_request_id if generation else None,
+                },
+            )
+        except Exception:
+            active.metadata.fail_assistant_message(
+                workspace_id,
+                assistant_message.id,
+                "The language service is temporarily unavailable.",
+            )
+            raise _http_error(503, "The language service is temporarily unavailable.") from None
+        return ConversationMessageResponse(
+            conversation_id=conversation_id,
+            user_message_id=user_message.id,
+            assistant_message_id=assistant_message.id,
+            answer=result.answer,
+            sources=result.sources,
+        )
 
     @api.get("/api/admin/status", response_model=AdminStatusResponse, dependencies=[Depends(require_admin)])
     def admin_status(active: Runtime = Depends(runtime)) -> AdminStatusResponse:

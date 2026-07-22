@@ -23,14 +23,20 @@ def test_sentence_transformer_embedding_provider_normalizes_without_download(mon
 
 def test_openai_provider_preserves_native_roles(monkeypatch):
     client = Mock()
-    client.chat.completions.create.return_value.choices = [Mock(message=Mock(content="answer"))]
+    client.chat.completions.create.return_value.choices = [
+        Mock(message=Mock(content="answer"), finish_reason="stop")
+    ]
+    client.chat.completions.create.return_value.model = "model"
+    client.chat.completions.create.return_value.usage = None
     monkeypatch.setattr(provider, "OpenAI", Mock(return_value=client))
     chat = provider.OpenAICompatibleChatProvider("key", "model", "https://example.test/v1")
 
-    assert (
-        chat.generate([{"role": "system", "content": "policy"}, {"role": "user", "content": "سلام"}])
-        == "answer"
+    result = chat.generate(
+        [{"role": "system", "content": "policy"}, {"role": "user", "content": "سلام"}]
     )
+
+    assert result.text == "answer"
+    assert result.model == "model"
     assert client.chat.completions.create.call_args.kwargs["messages"] == [
         {"role": "system", "content": "policy"},
         {"role": "user", "content": "سلام"},

@@ -46,6 +46,44 @@ class ChatResponse(BaseModel):
     sources: list[SourceItem]
 
 
+class ConversationCreateRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+
+
+class ConversationResponse(BaseModel):
+    id: str
+    title: str | None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    last_message_at: datetime | None
+
+
+class ConversationsResponse(BaseModel):
+    conversations: list[ConversationResponse]
+
+
+class ConversationMessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=20000)
+    client_message_id: str = Field(min_length=1, max_length=100)
+
+    @field_validator("message", "client_message_id")
+    @classmethod
+    def normalize_message_fields(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("value cannot be blank")
+        return value
+
+
+class ConversationMessageResponse(BaseModel):
+    conversation_id: str
+    user_message_id: str
+    assistant_message_id: str
+    answer: str
+    sources: list[SourceItem]
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
 

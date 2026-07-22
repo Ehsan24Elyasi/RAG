@@ -2,7 +2,7 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#13795b">
   <title>مدیریت دانش‌نامه | پاسخ‌یار</title>
   <link rel="icon" href="./static/favicon.svg" type="image/svg+xml">
@@ -29,7 +29,7 @@
         <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">پ</span><span>پاسخ‌یار<small>مدیریت دانش‌نامه</small></span></a>
         <span class="admin-title">مدیریت منابع پاسخ‌گویی</span>
       </div>
-      <div>
+      <div class="admin-header-actions">
         <button class="button button-secondary" type="button" id="refresh-button">به‌روزرسانی</button>
         <button class="button button-danger" type="button" id="logout-button">خروج</button>
       </div>
@@ -38,20 +38,20 @@
     <main class="admin-main">
       <div class="admin-page-heading">
         <div><h1>دانش‌نامه پشتیبانی</h1><p>فایل‌ها و صفحات راهنما را به سامانه اضافه و وضعیت پردازش را بررسی کنید.</p></div>
-        <span class="status-badge"><span class="status-dot" aria-hidden="true"></span><span id="system-status">در حال بررسی</span></span>
+        <span class="status-badge" id="status-badge" data-state="loading"><span class="status-dot" aria-hidden="true"></span><span id="system-status">در حال بررسی</span></span>
       </div>
 
       <section class="status-grid" aria-label="خلاصه وضعیت">
         <article class="status-tile"><span class="status-tile-label">وضعیت سرویس</span><strong class="status-tile-value textual" id="status-value">—</strong><p class="status-tile-help">اتصال API و پایگاه داده</p></article>
         <article class="status-tile"><span class="status-tile-label">اسناد فعال</span><strong class="status-tile-value" id="documents-value">۰</strong><p class="status-tile-help">فایل و صفحه وب</p></article>
         <article class="status-tile"><span class="status-tile-label">بخش‌های نمایه‌شده</span><strong class="status-tile-value" id="chunks-value">۰</strong><p class="status-tile-help">قطعه‌های قابل جست‌وجو</p></article>
-        <article class="status-tile"><span class="status-tile-label">ارائه‌دهنده‌ها</span><strong class="status-tile-value textual" id="providers-value" dir="auto">—</strong><p class="status-tile-help">Chat / Embedding</p></article>
+        <article class="status-tile"><span class="status-tile-label">ارائه‌دهنده‌ها</span><strong class="status-tile-value textual" id="providers-value" dir="auto">—</strong><p class="status-tile-help">گفت‌وگو / بردارسازی</p></article>
       </section>
 
       <div class="admin-grid">
         <div class="admin-stack">
           <section class="admin-card">
-            <div class="admin-card-heading"><div><h2>افزودن صفحه وب</h2><p>crawler فقط صفحه‌های عمومی و هم‌دامنه را پردازش می‌کند.</p></div></div>
+            <div class="admin-card-heading"><div><h2>افزودن صفحه وب</h2><p>خزشگر فقط صفحه‌های عمومی و هم‌دامنه را پردازش می‌کند.</p></div></div>
             <form class="admin-card-body" id="crawl-form">
               <div class="field"><label for="crawl-url">نشانی صفحه</label><input class="input" id="crawl-url" type="url" dir="ltr" required placeholder="https://example.com/help"></div>
               <div class="form-row">
@@ -81,7 +81,7 @@
 
         <section class="admin-card documents-card">
           <div class="admin-card-heading"><div><h2>اسناد دانش‌نامه</h2><p>منابعی که در پاسخ‌گویی استفاده می‌شوند</p></div><div class="documents-actions"><button class="button button-quiet" id="documents-refresh" type="button">تازه‌سازی</button></div></div>
-          <p class="inline-error" id="dashboard-error" role="alert" hidden></p>
+          <p class="inline-banner" id="dashboard-banner" role="status" aria-live="polite" hidden></p>
           <div class="documents-list" id="documents-list"><p class="loading-state">در حال دریافت اسناد…</p></div>
         </section>
       </div>
@@ -99,7 +99,9 @@
     const unlockForm = $("#unlock-form");
     const keyInput = $("#admin-key");
     const unlockError = $("#unlock-error");
-    const dashboardError = $("#dashboard-error");
+    const dashboardBanner = $("#dashboard-banner");
+    const refreshButtons = [$("#refresh-button"), $("#documents-refresh")];
+    const statusBadge = $("#status-badge");
     const documentsList = $("#documents-list");
     const operationList = $("#operation-list");
     const fileQueue = $("#file-queue");
@@ -112,7 +114,20 @@
     const date = value => value ? new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
     const safeDetail = error => error instanceof ApiError ? error.message : "عملیات انجام نشد. دوباره تلاش کنید.";
 
-    function setDashboardError(message = "") { dashboardError.textContent = message; dashboardError.hidden = !message; }
+    function setDashboardBanner(message = "", kind = "error") {
+      dashboardBanner.textContent = message;
+      dashboardBanner.dataset.kind = kind;
+      dashboardBanner.setAttribute("role", kind === "error" ? "alert" : "status");
+      dashboardBanner.hidden = !message;
+    }
+    function setDashboardBusy(value) {
+      refreshButtons.forEach(button => { button.disabled = value; });
+      adminShell.setAttribute("aria-busy", String(value));
+      if (value) {
+        statusBadge.dataset.state = "loading";
+        $("#system-status").textContent = "در حال بررسی";
+      }
+    }
     function showPanel() { unlockScreen.hidden = true; adminShell.hidden = false; }
     function showUnlock(message = "") { adminShell.hidden = true; unlockScreen.hidden = false; unlockError.textContent = message; unlockError.hidden = !message; keyInput.focus(); }
     function logout() { sessionStorage.removeItem(KEY); token = ""; keyInput.value = ""; showUnlock(); }
@@ -138,7 +153,7 @@
       if (!docs.length) {
         const empty = document.createElement("div"); empty.className = "empty-state";
         const text = document.createElement("div"); const title = document.createElement("strong"); title.textContent = "هنوز سندی وجود ندارد";
-        const help = document.createElement("p"); help.textContent = "یک فایل بارگذاری یا یک صفحه وب را crawl کنید."; text.append(title, help); empty.append(text); documentsList.append(empty); return;
+        const help = document.createElement("p"); help.textContent = "یک فایل بارگذاری کنید یا صفحه‌ای را از وب بخوانید."; text.append(title, help); empty.append(text); documentsList.append(empty); return;
       }
       docs.forEach(doc => {
         const row = document.createElement("article"); row.className = "document-row";
@@ -152,10 +167,12 @@
     }
 
     async function fetchDashboard() {
-      setDashboardError();
+      setDashboardBanner();
       const [status, documents] = await Promise.all([adminApi.status(token), adminApi.documents(token)]);
-      $("#status-value").textContent = status.status === "ok" ? "آماده" : "نیازمند بررسی";
-      $("#system-status").textContent = status.status === "ok" ? "سامانه آماده است" : "نیازمند بررسی";
+      const isReady = status.status === "ok";
+      $("#status-value").textContent = isReady ? "آماده" : "نیازمند بررسی";
+      $("#system-status").textContent = isReady ? "سامانه آماده است" : "نیازمند بررسی";
+      statusBadge.dataset.state = isReady ? "ok" : "error";
       $("#documents-value").textContent = fa(status.active_documents);
       $("#chunks-value").textContent = fa(status.indexed_chunks);
       $("#providers-value").textContent = `${status.chat_provider || "—"} / ${status.embedding_provider || "—"}`;
@@ -165,14 +182,19 @@
     async function loadDashboard() {
       if (!token || busy) return;
       busy = true;
+      setDashboardBusy(true);
       try { await fetchDashboard(); }
       catch (error) {
         if (error instanceof ApiError && [401, 403].includes(error.status)) {
           sessionStorage.removeItem(KEY); token = ""; keyInput.value = "";
           showUnlock("کلید مدیریت معتبر نیست.");
-        } else setDashboardError(safeDetail(error));
+        } else {
+          statusBadge.dataset.state = "error";
+          $("#system-status").textContent = "ارتباط برقرار نشد";
+          setDashboardBanner(safeDetail(error));
+        }
         throw error;
-      } finally { busy = false; }
+      } finally { busy = false; setDashboardBusy(false); }
     }
 
     unlockForm.addEventListener("submit", async event => {
@@ -186,16 +208,16 @@
     $("#documents-refresh").addEventListener("click", () => loadDashboard().catch(() => {}));
 
     $("#crawl-form").addEventListener("submit", async event => {
-      event.preventDefault(); const button = $("#crawl-button"); button.disabled = true; setDashboardError();
+      event.preventDefault(); const button = $("#crawl-button"); button.disabled = true; setDashboardBanner();
       try {
         const response = await adminApi.crawl(token, { url: $("#crawl-url").value.trim(), max_pages: Number($("#crawl-pages").value), max_depth: Number($("#crawl-depth").value) });
-        $("#crawl-url").value = ""; await fetchDashboard(); setDashboardError(`${fa(response.pages_visited)} صفحه پردازش شد.`);
-      } catch (error) { setDashboardError(safeDetail(error)); } finally { button.disabled = false; }
+        $("#crawl-url").value = ""; await fetchDashboard(); setDashboardBanner(`${fa(response.pages_visited)} صفحه پردازش شد.`, "success");
+      } catch (error) { setDashboardBanner(safeDetail(error)); } finally { button.disabled = false; }
     });
 
     async function uploadFiles(files) {
       const valid = [...files].filter(file => accepted.has(file.name.split(".").pop()?.toLowerCase()));
-      if (valid.length !== files.length) setDashboardError("فقط فایل‌های TXT، PDF و JSON مجاز هستند.");
+      if (valid.length !== files.length) setDashboardBanner("فقط فایل‌های TXT، PDF و JSON مجاز هستند.");
       fileQueue.replaceChildren();
       for (const file of valid) {
         const row = document.createElement("div"); row.className = "file-item"; const name = document.createElement("span"); name.className = "file-item-name"; name.dir = "auto"; name.textContent = file.name;
@@ -203,7 +225,7 @@
         try { const result = await adminApi.upload(token, file); state.textContent = result.unchanged ? "بدون تغییر" : `${fa(result.chunks_created)} بخش`; }
         catch (error) { row.classList.add("error"); state.textContent = safeDetail(error); }
       }
-      fileInput.value = ""; await fetchDashboard().catch(error => setDashboardError(safeDetail(error)));
+      fileInput.value = ""; await fetchDashboard().catch(error => setDashboardBanner(safeDetail(error)));
     }
     dropzone.addEventListener("click", () => fileInput.click());
     fileInput.addEventListener("change", () => uploadFiles([...fileInput.files]));

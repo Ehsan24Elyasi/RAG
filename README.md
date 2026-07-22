@@ -100,7 +100,9 @@ Local multilingual embeddings
 │   │   ├── documents.py         # Document indexing and replacement
 │   │   └── metadata.py          # SQLite metadata repository
 │   ├── static/
-│   │   ├── index.html           # Customer-facing page and chat widget
+│   │   ├── fonts/               # Self-hosted Vazirmatn webfont and license
+│   │   ├── index.html           # Customer-facing page and widget markup
+│   │   ├── widget.js            # Widget state, rendering, and host API
 │   │   ├── admin.html           # Admin dashboard
 │   │   ├── api.js               # Browser API client
 │   │   └── styles.css           # Shared responsive styling
@@ -198,8 +200,12 @@ CHUNK_OVERLAP=150
 MAX_HISTORY_MESSAGES=12
 MAX_MESSAGE_CHARS=4000
 
-# Admin authentication
+# Admin authentication and server-side widget conversations
 ADMIN_API_KEY=replace-this-with-a-long-random-secret
+SERVER_CONVERSATIONS_ENABLED=true
+WIDGET_TOKEN_SECRET=replace-this-with-a-separate-high-entropy-secret
+WIDGET_TOKEN_AUDIENCE=rag-widget
+WIDGET_TOKEN_CLOCK_SKEW_SECONDS=30
 
 # Optional direct browser origins
 # The bundled frontend is served by FastAPI and does not require CORS.
@@ -234,6 +240,8 @@ COMPANY_NAME=Jibi
 ```
 
 `RETRIEVAL_MAX_DISTANCE` controls the maximum accepted cosine distance for retrieved chunks. Lower values are stricter. The default `0.65` is a starting point and should be evaluated against your own documentation.
+
+`WIDGET_TOKEN_SECRET` is used by the host website to sign short-lived HS256 widget tokens. Each token must contain `workspace_id`, `external_user_id`, `aud`, `iat`, and `exp`. Never expose this signing secret to browser JavaScript. Server-side conversations are enabled by `SERVER_CONVERSATIONS_ENABLED` and require this secret in production.
 
 `ADMIN_API_KEY` is the password used to unlock the admin dashboard. For example:
 
@@ -740,7 +748,54 @@ docker compose down -v
 |---|---|---|
 | `GET` | `/` | Customer page and chat widget |
 | `GET` | `/healthz` | Service health check |
-| `POST` | `/api/chat` | RAG chat request |
+| `POST` | `/api/chat` | Legacy stateless RAG chat request |
+
+### Authenticated widget conversation endpoints
+
+These endpoints require a short-lived host-signed widget token:
+
+```text
+Authorization: Bearer YOUR_WIDGET_TOKEN
+```
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/conversations` | Create a server-side conversation |
+| `GET` | `/api/conversations` | List conversations owned by the authenticated user |
+| `POST` | `/api/conversations/{id}/messages` | Persist a user message and generate a persisted assistant answer |
+
+Message requests include a stable `client_message_id`; retries with the same ID reuse the same user and assistant message instead of creating duplicates. The legacy `/api/chat` endpoint remains available for pages that do not provide a widget token.
+
+### Widget integration
+
+The browser must receive only a short-lived signed widget token. Generate it on the trusted host server with `create_widget_token()` or an equivalent HS256 implementation; never send `WIDGET_TOKEN_SECRET` to the browser.
+
+Initialize the bundled singleton widget after obtaining a token from the host backend:
+
+```html
+<script type="module">
+  import "/static/widget.js";
+
+  // signedWidgetToken came from your authenticated host backend.
+  await window.RagSupportWidget.init({ token: signedWidgetToken, open: true });
+</script>
+```
+
+If the token is renewed while the page remains open, replace it in memory:
+
+```javascript
+await window.RagSupportWidget.setToken(refreshedSignedWidgetToken);
+```
+
+Available host methods are `init({ token, open })`, `setToken(token)`, `open()`, `close()`, and `reset()`.
+
+- With a token, the widget uses the authenticated server conversation endpoints and stable message IDs.
+- Without a token, it intentionally uses the legacy `/api/chat` endpoint and bounded browser history.
+- Tokens are kept only in JavaScript memory. They are not written to local storage, session storage, URLs, or the DOM.
+- The browser caches a bounded visible transcript and the active conversation ID. The current API does not expose transcript retrieval, so clearing browser storage removes the local display even though authenticated messages may remain in SQLite.
+- The reset control starts a fresh local conversation. It does not delete an existing server-side conversation.
+
+The customer UI uses a self-hosted [Vazirmatn](https://github.com/rastikerdar/vazirmatn) variable webfont under the SIL Open Font License; its license is stored in `app/static/fonts/OFL.txt`.
 
 ### Admin endpoints
 
@@ -872,7 +927,7 @@ http://127.0.0.1:8001/
 
 ### Reset the browser chat history
 
-Use the reset button inside the chat widget, or clear the site's local storage in browser developer tools.
+Use the reset button inside the chat widget, or clear the site's local storage in browser developer tools. In authenticated mode this clears the local transcript and starts a new conversation on the next message; it does not delete the previous conversation from SQLite.
 
 ## Security Notes
 
@@ -885,18 +940,17 @@ Use the reset button inside the chat widget, or clear the site's local storage i
 - Review crawler restrictions before allowing untrusted administrators to submit URLs.
 - Run a single application worker for this synchronous MVP unless ingestion coordination is moved to a process-shared system.
 
-## MVP Limitations
+## Current Limitations
 
-- No user accounts or role-based access control
-- No background queue
-- No ticketing or human handoff integration
-- No conversation database
-- No streaming chat responses
-- No multi-tenant document isolation
-- No distributed ingestion lock
-- Local ChromaDB is intended for a single application instance
+- External users are identified through host-signed widget tokens; there is no first-party login UI or full role-based access-control system.
+- Conversations and messages are persisted, but there is no public transcript retrieval endpoint or conversation-history selector in the widget yet.
+- No background job queue or scheduled crawler synchronization.
+- No ticketing, human handoff, feedback, or report API/UI yet.
+- No streaming chat responses or explicit generation cancellation yet.
+- Workspace-aware conversation identity exists, but document administration and retrieval still target the initial single-server deployment model.
+- No distributed ingestion lock; local ChromaDB is intended for one application instance.
 
-These constraints intentionally keep the MVP easy to install, understand, and run.
+These constraints keep the current release deployable on one server while leaving clear boundaries for the next industrial phases.
 
 ## License
 
