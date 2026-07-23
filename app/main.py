@@ -5,9 +5,11 @@ import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -18,7 +20,16 @@ from app.llm.provider import ChatProvider, EmbeddingProvider, create_chat_provid
 from app.observability import request_context_middleware
 from app.rag.vectorstore import VectorStore
 from app.schemas import (
+    AdminCitationResponse,
+    AdminConversationDetailResponse,
+    AdminConversationsResponse,
+    AdminConversationSummaryResponse,
+    AdminGenerationResponse,
+    AdminHandoffsResponse,
+    AdminMetricsResponse,
     AdminStatusResponse,
+    AdminTranscriptMessageResponse,
+    AdminUserResponse,
     ChatRequest,
     ChatResponse,
     ConversationCreateRequest,
@@ -30,13 +41,18 @@ from app.schemas import (
     CrawlResponse,
     DocumentResponse,
     DocumentsResponse,
+    HandoffCreateRequest,
+    HandoffCreateResponse,
+    HandoffResponse,
+    HandoffUpdateRequest,
     HealthResponse,
     IngestionRunResponse,
     IngestResponse,
+    LocalWidgetBootstrapResponse,
     PublicConfigResponse,
 )
-from app.security import WidgetIdentity, WidgetTokenError, verify_widget_token
-from app.services.chat import ChatService
+from app.security import WidgetIdentity, WidgetTokenError, create_widget_token, verify_widget_token
+from app.services.chat import ChatGenerationError, ChatService
 from app.services.crawler import CrawlError, WebCrawler
 from app.services.documents import DocumentService, IngestedDocument
 from app.services.metadata import IngestionRun, MetadataStore, User
@@ -65,6 +81,41 @@ def _http_error(status_code: int, detail: str) -> HTTPException:
     return HTTPException(status_code=status_code, detail=detail)
 
 
+def _effective_port(scheme: str, port: int | None) -> int | None:
+    if port is not None:
+        return port
+    return {"http": 80, "https": 443}.get(scheme)
+
+
+def _is_same_origin_loopback(request: Request) -> bool:
+    origin = request.headers.get("Origin", "")
+    if not origin or origin == "null":
+        return False
+    try:
+        parsed = urlsplit(origin)
+        origin_host = (parsed.hostname or "").lower()
+        origin_port = _effective_port(parsed.scheme.lower(), parsed.port)
+        request_host = (request.url.hostname or "").lower()
+        request_port = _effective_port(request.url.scheme.lower(), request.url.port)
+    except ValueError:
+        return False
+    loopback_hosts = {"127.0.0.1", "localhost", "::1"}
+    return bool(
+        parsed.scheme in {"http", "https"}
+        and not parsed.username
+        and not parsed.password
+        and parsed.path in {"", "/"}
+        and not parsed.query
+        and not parsed.fragment
+        and origin_host in loopback_hosts
+        and request_host in loopback_hosts
+        and parsed.scheme.lower() == request.url.scheme.lower()
+        and origin_host == request_host
+        and origin_port == request_port
+        and request.headers.get("Sec-Fetch-Site", "same-origin") in {"same-origin", "none"}
+    )
+
+
 def _run_response(run: IngestionRun) -> IngestionRunResponse:
     return IngestionRunResponse(**run.__dict__)
 
@@ -88,6 +139,27 @@ def _conversation_response(conversation) -> ConversationResponse:
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,
         last_message_at=conversation.last_message_at,
+    )
+
+
+def _user_response(user) -> AdminUserResponse:
+    return AdminUserResponse(
+        id=user.id,
+        external_id=user.external_id,
+        display_name=user.display_name,
+        email=user.email,
+    )
+
+
+def _handoff_response(handoff) -> HandoffResponse:
+    return HandoffResponse(
+        id=handoff.id,
+        conversation_id=handoff.conversation_id,
+        status=handoff.status,
+        reason=handoff.reason,
+        created_at=handoff.created_at,
+        updated_at=handoff.updated_at,
+        resolved_at=handoff.resolved_at,
     )
 
 
@@ -145,7 +217,7 @@ def create_app(
             CORSMiddleware,
             allow_origins=configured.cors_allowed_origins,
             allow_credentials=configured.cors_allow_credentials,
-            allow_methods=["GET", "POST"],
+            allow_methods=["GET", "POST", "PATCH", "DELETE"],
             allow_headers=["Authorization", "Content-Type"],
         )
 
@@ -168,9 +240,7 @@ def create_app(
         if not hmac.compare_digest(request.headers.get("Authorization", ""), expected):
             raise _http_error(401, "Authentication required.")
 
-    def require_widget_user(
-        request: Request, active: Runtime = Depends(runtime)
-    ) -> WidgetPrincipal:
+    def require_widget_user(request: Request, active: Runtime = Depends(runtime)) -> WidgetPrincipal:
         if not active.settings.server_conversations_enabled:
             raise _http_error(404, "Server conversations are not enabled.")
         secret = active.settings.widget_token_secret
@@ -207,6 +277,38 @@ def create_app(
         return PublicConfigResponse(
             assistant_name=configured.assistant_name,
             company_name=configured.company_name,
+            support_email=configured.support_email,
+            support_phone=configured.support_phone,
+            support_url=configured.support_url,
+        )
+
+    @api.post("/api/dev/widget-bootstrap", response_model=LocalWidgetBootstrapResponse)
+    def local_widget_bootstrap(
+        request: Request,
+        response: Response,
+        active: Runtime = Depends(runtime),
+    ) -> LocalWidgetBootstrapResponse:
+        if not active.settings.local_demo_widget_available:
+            raise _http_error(404, "Local widget bootstrap is not available.")
+        if not _is_same_origin_loopback(request):
+            raise _http_error(403, "Local widget bootstrap requires a same-origin loopback request.")
+        secret = active.settings.widget_token_secret
+        if not secret:
+            raise _http_error(404, "Local widget bootstrap is not available.")
+        token = create_widget_token(
+            secret.get_secret_value(),
+            workspace_id=active.metadata.default_workspace().id,
+            external_user_id=active.settings.local_demo_widget_external_user_id,
+            display_name=active.settings.local_demo_widget_display_name,
+            audience=active.settings.widget_token_audience,
+            expires_in_seconds=active.settings.local_demo_widget_token_ttl_seconds,
+        )
+        response.headers["Cache-Control"] = "no-store, private"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Vary"] = "Origin"
+        return LocalWidgetBootstrapResponse(
+            token=token,
+            expires_in_seconds=active.settings.local_demo_widget_token_ttl_seconds,
         )
 
     @api.post("/api/chat", response_model=ChatResponse)
@@ -224,7 +326,7 @@ def create_app(
                 active.settings.top_k,
             )
         except Exception:
-            raise _http_error(503, "The language service is temporarily unavailable.") from None
+            raise _http_error(503, "سرویس پاسخ‌گویی موقتاً در دسترس نیست.") from None
         return ChatResponse(answer=answer, sources=sources)
 
     @api.post("/api/conversations", response_model=ConversationResponse, status_code=201)
@@ -249,9 +351,7 @@ def create_app(
             principal.identity.workspace_id,
             principal.user.id,
         )
-        return ConversationsResponse(
-            conversations=[_conversation_response(item) for item in conversations]
-        )
+        return ConversationsResponse(conversations=[_conversation_response(item) for item in conversations])
 
     @api.post(
         "/api/conversations/{conversation_id}/messages",
@@ -352,31 +452,51 @@ def create_app(
                 ],
             )
             generation = result.generation
+            if generation is not None:
+                active.metadata.record_generation_usage(
+                    workspace_id,
+                    conversation_id,
+                    assistant_message.id,
+                    status="completed",
+                    provider=active.settings.chat_provider,
+                    model=generation.model,
+                    prompt_tokens=generation.usage.prompt_tokens,
+                    completion_tokens=generation.usage.completion_tokens,
+                    total_tokens=generation.usage.total_tokens,
+                    latency_ms=generation.latency_ms,
+                    finish_reason=generation.finish_reason,
+                    request_id=request.state.request_id,
+                    metadata={
+                        "context_count": len(result.sources),
+                        "provider_request_id": generation.provider_request_id,
+                    },
+                )
+        except ChatGenerationError as error:
+            active.metadata.fail_assistant_message(
+                workspace_id,
+                assistant_message.id,
+                "سرویس پاسخ‌گویی موقتاً در دسترس نیست.",
+            )
             active.metadata.record_generation_usage(
                 workspace_id,
                 conversation_id,
                 assistant_message.id,
-                status="completed",
-                provider=active.settings.chat_provider if generation else "local",
-                model=generation.model if generation else None,
-                prompt_tokens=generation.usage.prompt_tokens if generation else None,
-                completion_tokens=generation.usage.completion_tokens if generation else None,
-                total_tokens=generation.usage.total_tokens if generation else None,
-                latency_ms=generation.latency_ms if generation else 0,
-                finish_reason=generation.finish_reason if generation else "deterministic",
+                status="failed",
+                provider=active.settings.chat_provider,
+                model=active.settings.chat_model,
+                latency_ms=error.latency_ms,
                 request_id=request.state.request_id,
-                metadata={
-                    "context_count": len(result.sources),
-                    "provider_request_id": generation.provider_request_id if generation else None,
-                },
+                metadata={"failure_phase": "generation"},
+                error_message="Chat provider generation failed.",
             )
+            raise _http_error(503, "سرویس پاسخ‌گویی موقتاً در دسترس نیست.") from None
         except Exception:
             active.metadata.fail_assistant_message(
                 workspace_id,
                 assistant_message.id,
-                "The language service is temporarily unavailable.",
+                "سرویس پاسخ‌گویی موقتاً در دسترس نیست.",
             )
-            raise _http_error(503, "The language service is temporarily unavailable.") from None
+            raise _http_error(503, "سرویس پاسخ‌گویی موقتاً در دسترس نیست.") from None
         return ConversationMessageResponse(
             conversation_id=conversation_id,
             user_message_id=user_message.id,
@@ -384,6 +504,27 @@ def create_app(
             answer=result.answer,
             sources=result.sources,
         )
+
+    @api.post(
+        "/api/conversations/{conversation_id}/handoff",
+        response_model=HandoffCreateResponse,
+    )
+    def create_handoff(
+        conversation_id: str,
+        request_body: HandoffCreateRequest,
+        principal: WidgetPrincipal = Depends(require_widget_user),
+        active: Runtime = Depends(runtime),
+    ) -> HandoffCreateResponse:
+        try:
+            handoff, created = active.metadata.create_or_get_active_handoff(
+                principal.identity.workspace_id,
+                conversation_id,
+                principal.user.id,
+                request_body.reason,
+            )
+        except ValueError:
+            raise _http_error(404, "Conversation not found.") from None
+        return HandoffCreateResponse(created=created, handoff=_handoff_response(handoff))
 
     @api.get("/api/admin/status", response_model=AdminStatusResponse, dependencies=[Depends(require_admin)])
     def admin_status(active: Runtime = Depends(runtime)) -> AdminStatusResponse:
@@ -396,6 +537,171 @@ def create_app(
             embedding_provider=active.settings.embedding_provider,
             recent_runs=[_run_response(run) for run in active.metadata.recent_runs()],
         )
+
+    @api.get("/api/admin/metrics", response_model=AdminMetricsResponse, dependencies=[Depends(require_admin)])
+    def admin_metrics(days: int = 30, active: Runtime = Depends(runtime)) -> AdminMetricsResponse:
+        if days not in {7, 30, 90}:
+            raise _http_error(422, "The metrics period must be 7, 30, or 90 days.")
+        end = datetime.now(timezone.utc)
+        metrics = active.metadata.usage_metrics(
+            active.metadata.default_workspace().id,
+            end - timedelta(days=days),
+            end,
+        )
+        return AdminMetricsResponse(**metrics.__dict__)
+
+    @api.get(
+        "/api/admin/conversations",
+        response_model=AdminConversationsResponse,
+        dependencies=[Depends(require_admin)],
+    )
+    def admin_conversations(
+        search: str | None = None,
+        status: str | None = None,
+        handoff: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        active: Runtime = Depends(runtime),
+    ) -> AdminConversationsResponse:
+        if page < 1 or page_size < 1 or page_size > 100:
+            raise _http_error(422, "Invalid pagination.")
+        items, total = active.metadata.list_admin_conversations(
+            active.metadata.default_workspace().id,
+            search=search.strip()[:200] if search else None,
+            status=status,
+            handoff=handoff,
+            page=page,
+            page_size=page_size,
+        )
+        return AdminConversationsResponse(
+            conversations=[
+                AdminConversationSummaryResponse(
+                    id=item.conversation.id,
+                    title=item.conversation.title,
+                    status=item.conversation.status,
+                    created_at=item.conversation.created_at,
+                    updated_at=item.conversation.updated_at,
+                    last_message_at=item.conversation.last_message_at,
+                    user=_user_response(item.user),
+                    last_message_preview=item.last_message_preview,
+                    message_count=item.message_count,
+                    token_total=item.token_total,
+                    active_handoff=(_handoff_response(item.active_handoff) if item.active_handoff else None),
+                )
+                for item in items
+            ],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    @api.get(
+        "/api/admin/conversations/{conversation_id}",
+        response_model=AdminConversationDetailResponse,
+        dependencies=[Depends(require_admin)],
+    )
+    def admin_conversation_detail(
+        conversation_id: str, active: Runtime = Depends(runtime)
+    ) -> AdminConversationDetailResponse:
+        detail = active.metadata.admin_conversation_detail(
+            active.metadata.default_workspace().id, conversation_id
+        )
+        if detail is None:
+            raise _http_error(404, "Conversation not found.")
+        messages = []
+        for message in detail.messages:
+            generation = detail.generations.get(message.id)
+            messages.append(
+                AdminTranscriptMessageResponse(
+                    id=message.id,
+                    role=message.role,
+                    status=message.status,
+                    content=message.content,
+                    error_message=message.error_message,
+                    created_at=message.created_at,
+                    completed_at=message.completed_at,
+                    citations=[
+                        AdminCitationResponse(
+                            position=item.position,
+                            document_id=item.document_id,
+                            source_name=item.source_name,
+                            source_url=item.source_url,
+                            excerpt=item.excerpt,
+                            metadata=item.metadata,
+                        )
+                        for item in detail.citations.get(message.id, [])
+                    ],
+                    generation=(
+                        AdminGenerationResponse(
+                            provider=generation.provider,
+                            model=generation.model,
+                            status=generation.status,
+                            prompt_tokens=generation.prompt_tokens,
+                            completion_tokens=generation.completion_tokens,
+                            total_tokens=generation.total_tokens,
+                            latency_ms=generation.latency_ms,
+                            finish_reason=generation.finish_reason,
+                        )
+                        if generation
+                        else None
+                    ),
+                )
+            )
+        return AdminConversationDetailResponse(
+            conversation=_conversation_response(detail.conversation),
+            user=_user_response(detail.user),
+            messages=messages,
+            handoffs=[_handoff_response(item) for item in detail.handoffs],
+            messages_truncated=detail.messages_truncated,
+        )
+
+    @api.get(
+        "/api/admin/handoffs",
+        response_model=AdminHandoffsResponse,
+        dependencies=[Depends(require_admin)],
+    )
+    def admin_handoffs(
+        status: str | None = None,
+        page: int = 1,
+        page_size: int = 50,
+        active: Runtime = Depends(runtime),
+    ) -> AdminHandoffsResponse:
+        if status and status not in {"requested", "in_progress", "resolved", "cancelled"}:
+            raise _http_error(422, "Invalid handoff status.")
+        if page < 1 or page_size < 1 or page_size > 100:
+            raise _http_error(422, "Invalid pagination.")
+        items, total = active.metadata.list_handoffs(
+            active.metadata.default_workspace().id,
+            status=status,
+            page=page,
+            page_size=page_size,
+        )
+        return AdminHandoffsResponse(
+            handoffs=[_handoff_response(item) for item in items],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    @api.patch(
+        "/api/admin/handoffs/{handoff_id}",
+        response_model=HandoffResponse,
+        dependencies=[Depends(require_admin)],
+    )
+    def update_admin_handoff(
+        handoff_id: str,
+        request_body: HandoffUpdateRequest,
+        active: Runtime = Depends(runtime),
+    ) -> HandoffResponse:
+        try:
+            handoff = active.metadata.update_handoff_status(
+                active.metadata.default_workspace().id, handoff_id, request_body.status
+            )
+        except ValueError:
+            raise _http_error(409, "Invalid handoff status transition.") from None
+        if handoff is None:
+            raise _http_error(404, "Handoff request not found.")
+        return _handoff_response(handoff)
 
     @api.get("/api/admin/documents", response_model=DocumentsResponse, dependencies=[Depends(require_admin)])
     def list_documents(active: Runtime = Depends(runtime)) -> DocumentsResponse:
@@ -413,6 +719,23 @@ def create_app(
                 for item in active.metadata.list_documents()
             ]
         )
+
+    @api.delete("/api/admin/documents/{document_id}", status_code=204, dependencies=[Depends(require_admin)])
+    def delete_document(document_id: str, active: Runtime = Depends(runtime)) -> None:
+        if not active.ingestion_lock.acquire(blocking=False):
+            raise _http_error(409, "Another ingestion is already running.")
+        try:
+            deleted = active.documents.delete_upload(active.metadata.default_workspace().id, document_id)
+            if not deleted:
+                raise _http_error(404, "Document not found.")
+        except HTTPException:
+            raise
+        except ValueError as exc:
+            raise _http_error(409, str(exc)) from None
+        except Exception:
+            raise _http_error(503, "The document could not be deleted.") from None
+        finally:
+            active.ingestion_lock.release()
 
     @api.post("/api/admin/upload", response_model=IngestResponse, dependencies=[Depends(require_admin)])
     async def upload_document(

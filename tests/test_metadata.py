@@ -44,9 +44,7 @@ def test_initialize_migrates_legacy_catalogue_without_data_loss(tmp_path):
             "INSERT INTO documents VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             ("doc-1", "faq", "FAQ", "text", None, "hash", 1, now),
         )
-        connection.execute(
-            "INSERT INTO document_chunks VALUES ('vec-1', 'doc-1', 'hash', 0)"
-        )
+        connection.execute("INSERT INTO document_chunks VALUES ('vec-1', 'doc-1', 'hash', 0)")
         connection.execute(
             """INSERT INTO ingestion_runs
                VALUES ('run-1', 'file', 'faq.txt', 'completed', 1, 1, NULL, ?, ?)""",
@@ -64,16 +62,14 @@ def test_initialize_migrates_legacy_catalogue_without_data_loss(tmp_path):
         run_workspace = connection.execute(
             "SELECT workspace_id FROM ingestion_runs WHERE id = 'run-1'"
         ).fetchone()[0]
-        versions = connection.execute(
-            "SELECT version FROM schema_migrations ORDER BY version"
-        ).fetchall()
+        versions = connection.execute("SELECT version FROM schema_migrations ORDER BY version").fetchall()
         chunk = connection.execute(
             "SELECT vector_id FROM document_chunks WHERE document_id = 'doc-1'"
         ).fetchone()[0]
 
     assert document == (None, DEFAULT_WORKSPACE_ID)
     assert run_workspace == DEFAULT_WORKSPACE_ID
-    assert versions == [(1,), (2,), (3,), (4,), (5,), (6,)]
+    assert versions == [(1,), (2,), (3,), (4,), (5,), (6,), (7,)]
     assert chunk == "vec-1"
     assert store.document_for_source("faq") is not None
 
@@ -114,9 +110,7 @@ def test_user_upsert_is_stable_and_updates_profile(tmp_path):
     store.initialize()
     workspace_id = store.default_workspace().id
 
-    first = store.upsert_user(
-        workspace_id, "customer-1", display_name="First", metadata={"tier": "basic"}
-    )
+    first = store.upsert_user(workspace_id, "customer-1", display_name="First", metadata={"tier": "basic"})
     second = store.upsert_user(
         workspace_id,
         "customer-1",
@@ -166,9 +160,7 @@ def test_message_idempotency_and_bounded_history(tmp_path):
         "ignored retry body",
         client_message_id="client-1",
     )
-    assistant = store.create_assistant_placeholder(
-        workspace_id, conversation.id, user_id=user.id
-    )
+    assistant = store.create_assistant_placeholder(workspace_id, conversation.id, user_id=user.id)
     completed = store.complete_assistant_message(workspace_id, assistant.id, "welcome")
     store.append_user_message(
         workspace_id,
@@ -178,17 +170,13 @@ def test_message_idempotency_and_bounded_history(tmp_path):
         client_message_id="client-2",
     )
 
-    history = store.load_conversation_history(
-        workspace_id, conversation.id, user_id=user.id, limit=2
-    )
+    history = store.load_conversation_history(workspace_id, conversation.id, user_id=user.id, limit=2)
 
     assert duplicate.id == first.id
     assert duplicate.content == "hello"
     assert completed is not None and completed.status == "completed"
     assert [message.content for message in history] == ["welcome", "follow-up"]
-    assert store.load_conversation_history(
-        "wrong-workspace", conversation.id, user_id=user.id
-    ) == []
+    assert store.load_conversation_history("wrong-workspace", conversation.id, user_id=user.id) == []
 
 
 def test_generation_usage_accepts_nullable_fields(tmp_path):
@@ -218,3 +206,73 @@ def test_generation_usage_accepts_nullable_fields(tmp_path):
     assert generation.total_tokens is None
     assert generation.metadata == {"cached": False}
     assert generation.finished_at is not None
+
+
+def test_usage_metrics_exclude_legacy_local_generations(tmp_path):
+    from datetime import timedelta
+
+    store = MetadataStore(tmp_path / "metrics.sqlite3")
+    store.initialize()
+    workspace_id = store.default_workspace().id
+    user = store.upsert_user(workspace_id, "metrics-customer")
+    conversation = store.create_conversation(workspace_id, user.id)
+    store.append_user_message(
+        workspace_id,
+        conversation.id,
+        user.id,
+        "question",
+        client_message_id="metrics-user-1",
+    )
+    assistant = store.create_assistant_placeholder(workspace_id, conversation.id)
+    store.complete_assistant_message(workspace_id, assistant.id, "answer")
+    store.record_generation_usage(
+        workspace_id,
+        conversation.id,
+        assistant.id,
+        status="completed",
+        provider="test-provider",
+        model="test-model",
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+        latency_ms=120,
+    )
+    store.record_generation_usage(
+        workspace_id,
+        conversation.id,
+        assistant.id,
+        status="completed",
+        provider="local",
+        model=None,
+        total_tokens=None,
+        latency_ms=0,
+        finish_reason="deterministic",
+    )
+    store.record_generation_usage(
+        workspace_id,
+        conversation.id,
+        assistant.id,
+        status="failed",
+        provider="test-provider",
+        model="test-model",
+        latency_ms=40,
+    )
+    now = store._now()
+
+    metrics = store.usage_metrics(
+        workspace_id,
+        now - timedelta(days=1),
+        now + timedelta(days=1),
+    )
+
+    assert metrics.new_conversations == 1
+    assert metrics.user_messages == 1
+    assert metrics.assistant_messages == 1
+    assert metrics.successful_generations == 1
+    assert metrics.failed_generations == 1
+    assert metrics.average_latency_ms == 120
+    assert metrics.prompt_tokens == 10
+    assert metrics.completion_tokens == 5
+    assert metrics.total_tokens == 15
+    assert metrics.lifetime_total_tokens == 15
+    assert metrics.unreported_runs == 0

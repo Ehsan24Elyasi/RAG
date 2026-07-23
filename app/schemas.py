@@ -91,6 +91,14 @@ class HealthResponse(BaseModel):
 class PublicConfigResponse(BaseModel):
     assistant_name: str
     company_name: str
+    support_email: str | None = None
+    support_phone: str | None = None
+    support_url: str | None = None
+
+
+class LocalWidgetBootstrapResponse(BaseModel):
+    token: str
+    expires_in_seconds: int
 
 
 class IngestionRunResponse(BaseModel):
@@ -147,3 +155,129 @@ class CrawlResponse(BaseModel):
     pages_visited: int
     documents: list[IngestResponse]
     run_id: str
+
+
+HandoffStatus = Literal["requested", "in_progress", "resolved", "cancelled"]
+
+
+class AdminMetricsResponse(BaseModel):
+    start: datetime
+    end: datetime
+    new_conversations: int
+    user_messages: int
+    assistant_messages: int
+    successful_generations: int
+    failed_generations: int
+    average_latency_ms: float | None
+    open_handoffs: int
+    resolved_handoffs: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    lifetime_total_tokens: int
+    unreported_runs: int
+
+
+class AdminUserResponse(BaseModel):
+    id: str
+    external_id: str
+    display_name: str | None
+    email: str | None
+
+
+class HandoffResponse(BaseModel):
+    id: str
+    conversation_id: str
+    status: HandoffStatus
+    reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None
+
+
+class HandoffCreateRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+
+class HandoffCreateResponse(BaseModel):
+    created: bool
+    handoff: HandoffResponse
+
+
+class HandoffUpdateRequest(BaseModel):
+    status: Literal["in_progress", "resolved", "cancelled"]
+
+
+class AdminConversationSummaryResponse(BaseModel):
+    id: str
+    title: str | None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    last_message_at: datetime | None
+    user: AdminUserResponse
+    last_message_preview: str | None
+    message_count: int
+    token_total: int
+    active_handoff: HandoffResponse | None
+
+
+class AdminConversationsResponse(BaseModel):
+    conversations: list[AdminConversationSummaryResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class AdminCitationResponse(BaseModel):
+    position: int
+    document_id: str | None
+    source_name: str | None
+    source_url: str | None
+    excerpt: str | None
+    metadata: dict | None
+
+
+class AdminGenerationResponse(BaseModel):
+    provider: str | None
+    model: str | None
+    status: str
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    total_tokens: int | None
+    latency_ms: int | None
+    finish_reason: str | None
+
+
+class AdminTranscriptMessageResponse(BaseModel):
+    id: str
+    role: str
+    status: str
+    content: str | None
+    error_message: str | None
+    created_at: datetime
+    completed_at: datetime | None
+    citations: list[AdminCitationResponse]
+    generation: AdminGenerationResponse | None
+
+
+class AdminConversationDetailResponse(BaseModel):
+    conversation: ConversationResponse
+    user: AdminUserResponse
+    messages: list[AdminTranscriptMessageResponse]
+    handoffs: list[HandoffResponse]
+    messages_truncated: bool
+
+
+class AdminHandoffsResponse(BaseModel):
+    handoffs: list[HandoffResponse]
+    total: int
+    page: int
+    page_size: int

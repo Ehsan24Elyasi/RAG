@@ -104,6 +104,66 @@ class MessageCitation:
 
 
 @dataclass(frozen=True)
+class HandoffRequest:
+    id: str
+    workspace_id: str
+    conversation_id: str
+    user_id: str | None
+    status: str
+    reason: str | None
+    metadata: dict[str, Any] | None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None
+
+
+@dataclass(frozen=True)
+class UsageMetrics:
+    start: datetime
+    end: datetime
+    new_conversations: int
+    user_messages: int
+    assistant_messages: int
+    successful_generations: int
+    failed_generations: int
+    average_latency_ms: float | None
+    open_handoffs: int
+    resolved_handoffs: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    lifetime_total_tokens: int
+    unreported_runs: int
+
+
+@dataclass(frozen=True)
+class AdminConversationSummary:
+    conversation: Conversation
+    user: User
+    last_message_preview: str | None
+    message_count: int
+    token_total: int
+    active_handoff: HandoffRequest | None
+
+
+@dataclass(frozen=True)
+class AdminConversationDetail:
+    conversation: Conversation
+    user: User
+    messages: list[Message]
+    citations: dict[str, list[MessageCitation]]
+    generations: dict[str, GenerationRun]
+    handoffs: list[HandoffRequest]
+    messages_truncated: bool
+
+
+@dataclass(frozen=True)
+class DocumentDeletionCandidate:
+    document: StoredDocument
+    vector_ids: list[str]
+
+
+@dataclass(frozen=True)
 class GenerationRun:
     id: str
     workspace_id: str
@@ -439,9 +499,7 @@ class MetadataStore:
     ) -> Message:
         now = self._now().isoformat()
         with self._connection() as connection:
-            conversation = self._authorized_conversation(
-                connection, workspace_id, conversation_id, user_id
-            )
+            conversation = self._authorized_conversation(connection, workspace_id, conversation_id, user_id)
             if conversation is None:
                 raise ValueError("Conversation is not authorized for this user and workspace.")
             message_id = str(uuid.uuid4())
@@ -544,17 +602,13 @@ class MetadataStore:
         assert row is not None
         return self._row_to_message(row), bool(cursor.rowcount)
 
-    def complete_assistant_message(
-        self, workspace_id: str, message_id: str, content: str
-    ) -> Message | None:
+    def complete_assistant_message(self, workspace_id: str, message_id: str, content: str) -> Message | None:
         return self._finish_assistant_message(workspace_id, message_id, "completed", content, None)
 
     def fail_assistant_message(
         self, workspace_id: str, message_id: str, error_message: str
     ) -> Message | None:
-        return self._finish_assistant_message(
-            workspace_id, message_id, "failed", None, error_message
-        )
+        return self._finish_assistant_message(workspace_id, message_id, "failed", None, error_message)
 
     def stop_assistant_message(
         self, workspace_id: str, message_id: str, content: str | None = None
@@ -579,9 +633,7 @@ class MetadataStore:
         if limit <= 0:
             return []
         with self._connection() as connection:
-            if self._authorized_conversation(
-                connection, workspace_id, conversation_id, user_id
-            ) is None:
+            if self._authorized_conversation(connection, workspace_id, conversation_id, user_id) is None:
                 return []
             rows = connection.execute(
                 """SELECT * FROM (
@@ -639,9 +691,7 @@ class MetadataStore:
             ).fetchall()
         return [self._row_to_citation(row) for row in rows]
 
-    def citations_for_message(
-        self, workspace_id: str, message_id: str
-    ) -> list[MessageCitation]:
+    def citations_for_message(self, workspace_id: str, message_id: str) -> list[MessageCitation]:
         with self._connection() as connection:
             rows = connection.execute(
                 """SELECT * FROM message_citations
@@ -712,6 +762,285 @@ class MetadataStore:
         assert row is not None
         return self._row_to_generation_run(row)
 
+    def usage_metrics(self, workspace_id: str, start: datetime, end: datetime) -> UsageMetrics:
+        start_iso, end_iso = start.isoformat(), end.isoformat()
+        with self._connection() as connection:
+            conversations = connection.execute(
+                "SELECT COUNT(*) FROM conversations WHERE workspace_id = ? AND created_at >= ? AND created_at < ?",
+                (workspace_id, start_iso, end_iso),
+            ).fetchone()[0]
+            user_messages = connection.execute(
+                """SELECT COUNT(*) FROM messages WHERE workspace_id = ? AND role = 'user'
+                   AND created_at >= ? AND created_at < ?""",
+                (workspace_id, start_iso, end_iso),
+            ).fetchone()[0]
+            assistant_messages = connection.execute(
+                """SELECT COUNT(*) FROM messages WHERE workspace_id = ? AND role = 'assistant'
+                   AND status = 'completed' AND completed_at >= ? AND completed_at < ?""",
+                (workspace_id, start_iso, end_iso),
+            ).fetchone()[0]
+            generation = connection.execute(
+                """SELECT SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) successful,
+                          SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) failed,
+                          AVG(CASE WHEN status = 'completed' AND latency_ms IS NOT NULL
+                              THEN latency_ms END) latency,
+                          COALESCE(SUM(CASE WHEN status = 'completed' THEN prompt_tokens END), 0) prompt,
+                          COALESCE(SUM(CASE WHEN status = 'completed' THEN completion_tokens END), 0) completion,
+                          COALESCE(SUM(CASE WHEN status = 'completed' THEN total_tokens END), 0) total,
+                          SUM(CASE WHEN status = 'completed' AND total_tokens IS NULL THEN 1 ELSE 0 END) unreported
+                   FROM generation_runs WHERE workspace_id = ? AND created_at >= ? AND created_at < ?
+                   AND NOT (provider = 'local' AND finish_reason = 'deterministic'
+                            AND total_tokens IS NULL AND latency_ms = 0)""",
+                (workspace_id, start_iso, end_iso),
+            ).fetchone()
+            lifetime = connection.execute(
+                """SELECT COALESCE(SUM(total_tokens), 0) FROM generation_runs
+                   WHERE workspace_id = ? AND status = 'completed'
+                   AND NOT (provider = 'local' AND finish_reason = 'deterministic'
+                            AND total_tokens IS NULL AND latency_ms = 0)""",
+                (workspace_id,),
+            ).fetchone()[0]
+            handoffs = connection.execute(
+                """SELECT SUM(CASE WHEN status IN ('requested','in_progress') THEN 1 ELSE 0 END) open_count,
+                          SUM(CASE WHEN status = 'resolved' AND resolved_at >= ? AND resolved_at < ?
+                              THEN 1 ELSE 0 END) resolved_count
+                   FROM handoff_requests WHERE workspace_id = ?""",
+                (start_iso, end_iso, workspace_id),
+            ).fetchone()
+        return UsageMetrics(
+            start,
+            end,
+            int(conversations),
+            int(user_messages),
+            int(assistant_messages),
+            int(generation["successful"] or 0),
+            int(generation["failed"] or 0),
+            float(generation["latency"]) if generation["latency"] is not None else None,
+            int(handoffs["open_count"] or 0),
+            int(handoffs["resolved_count"] or 0),
+            int(generation["prompt"]),
+            int(generation["completion"]),
+            int(generation["total"]),
+            int(lifetime),
+            int(generation["unreported"] or 0),
+        )
+
+    def list_admin_conversations(
+        self,
+        workspace_id: str,
+        *,
+        search: str | None = None,
+        status: str | None = None,
+        handoff: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[AdminConversationSummary], int]:
+        clauses = ["c.workspace_id = ?"]
+        parameters: list[Any] = [workspace_id]
+        if search:
+            clauses.append(
+                "(c.title LIKE ? OR u.display_name LIKE ? OR u.email LIKE ? OR u.external_id LIKE ?)"
+            )
+            term = f"%{search}%"
+            parameters.extend([term] * 4)
+        if status:
+            clauses.append("c.status = ?")
+            parameters.append(status)
+        if handoff == "active":
+            clauses.append("h.id IS NOT NULL")
+        elif handoff == "none":
+            clauses.append("h.id IS NULL")
+        where = " AND ".join(clauses)
+        base = f"""FROM conversations c JOIN users u ON u.id = c.user_id AND u.workspace_id = c.workspace_id
+            LEFT JOIN handoff_requests h ON h.conversation_id = c.id AND h.workspace_id = c.workspace_id
+              AND h.status IN ('requested','in_progress') WHERE {where}"""
+        with self._connection() as connection:
+            total = int(connection.execute(f"SELECT COUNT(*) {base}", parameters).fetchone()[0])
+            rows = connection.execute(
+                f"""SELECT c.*, u.external_id u_external_id, u.display_name u_display_name,
+                u.email u_email, u.metadata_json u_metadata_json, u.created_at u_created_at, u.updated_at u_updated_at,
+                h.id h_id, h.user_id h_user_id, h.status h_status, h.reason h_reason, h.metadata_json h_metadata_json,
+                h.created_at h_created_at, h.updated_at h_updated_at, h.resolved_at h_resolved_at,
+                (SELECT content FROM messages m WHERE m.workspace_id=c.workspace_id AND m.conversation_id=c.id
+                 ORDER BY m.created_at DESC, m.id DESC LIMIT 1) preview,
+                (SELECT COUNT(*) FROM messages m WHERE m.workspace_id=c.workspace_id AND m.conversation_id=c.id) message_count,
+                (SELECT COALESCE(SUM(g.total_tokens),0) FROM generation_runs g WHERE g.workspace_id=c.workspace_id AND g.conversation_id=c.id) token_total
+                {base} ORDER BY COALESCE(c.last_message_at,c.updated_at) DESC, c.id DESC LIMIT ? OFFSET ?""",
+                (*parameters, page_size, (page - 1) * page_size),
+            ).fetchall()
+        results = []
+        for row in rows:
+            user = User(
+                str(row["user_id"]),
+                workspace_id,
+                str(row["u_external_id"]),
+                row["u_display_name"],
+                row["u_email"],
+                self._load_json(row["u_metadata_json"]),
+                self._parse_datetime(row["u_created_at"]) or self._now(),
+                self._parse_datetime(row["u_updated_at"]) or self._now(),
+            )
+            handoff_item = self._row_to_handoff(row, prefix="h_") if row["h_id"] else None
+            results.append(
+                AdminConversationSummary(
+                    self._row_to_conversation(row),
+                    user,
+                    row["preview"],
+                    int(row["message_count"]),
+                    int(row["token_total"]),
+                    handoff_item,
+                )
+            )
+        return results, total
+
+    def admin_conversation_detail(
+        self, workspace_id: str, conversation_id: str, *, limit: int = 500
+    ) -> AdminConversationDetail | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                """SELECT c.*, u.external_id u_external_id, u.display_name u_display_name, u.email u_email,
+                u.metadata_json u_metadata_json, u.created_at u_created_at, u.updated_at u_updated_at
+                FROM conversations c JOIN users u ON u.id=c.user_id WHERE c.workspace_id=? AND c.id=?""",
+                (workspace_id, conversation_id),
+            ).fetchone()
+            if row is None:
+                return None
+            message_rows = connection.execute(
+                "SELECT * FROM messages WHERE workspace_id=? AND conversation_id=? ORDER BY created_at,id LIMIT ?",
+                (workspace_id, conversation_id, limit + 1),
+            ).fetchall()
+            selected = message_rows[:limit]
+            ids = [str(item["id"]) for item in selected]
+            citations: dict[str, list[MessageCitation]] = {item: [] for item in ids}
+            generations: dict[str, GenerationRun] = {}
+            if ids:
+                marks = ",".join("?" for _ in ids)
+                for citation in connection.execute(
+                    f"SELECT * FROM message_citations WHERE workspace_id=? AND message_id IN ({marks}) ORDER BY position",
+                    (workspace_id, *ids),
+                ):
+                    citations[str(citation["message_id"])].append(self._row_to_citation(citation))
+                for generation in connection.execute(
+                    f"SELECT * FROM generation_runs WHERE workspace_id=? AND message_id IN ({marks}) ORDER BY created_at DESC",
+                    (workspace_id, *ids),
+                ):
+                    generations.setdefault(
+                        str(generation["message_id"]), self._row_to_generation_run(generation)
+                    )
+            handoff_rows = connection.execute(
+                "SELECT * FROM handoff_requests WHERE workspace_id=? AND conversation_id=? ORDER BY created_at",
+                (workspace_id, conversation_id),
+            ).fetchall()
+        user = User(
+            str(row["user_id"]),
+            workspace_id,
+            str(row["u_external_id"]),
+            row["u_display_name"],
+            row["u_email"],
+            self._load_json(row["u_metadata_json"]),
+            self._parse_datetime(row["u_created_at"]) or self._now(),
+            self._parse_datetime(row["u_updated_at"]) or self._now(),
+        )
+        return AdminConversationDetail(
+            self._row_to_conversation(row),
+            user,
+            [self._row_to_message(item) for item in selected],
+            citations,
+            generations,
+            [self._row_to_handoff(item) for item in handoff_rows],
+            len(message_rows) > limit,
+        )
+
+    def create_or_get_active_handoff(
+        self, workspace_id: str, conversation_id: str, user_id: str, reason: str | None = None
+    ) -> tuple[HandoffRequest, bool]:
+        now, handoff_id = self._now().isoformat(), str(uuid.uuid4())
+        with self._connection() as connection:
+            if self._authorized_conversation(connection, workspace_id, conversation_id, user_id) is None:
+                raise ValueError("Conversation is not authorized for this user and workspace.")
+            cursor = connection.execute(
+                """INSERT OR IGNORE INTO handoff_requests
+                (id,workspace_id,conversation_id,user_id,status,reason,created_at,updated_at)
+                VALUES (?,?,?,?,'requested',?,?,?)""",
+                (handoff_id, workspace_id, conversation_id, user_id, reason, now, now),
+            )
+            row = connection.execute(
+                "SELECT * FROM handoff_requests WHERE workspace_id=? AND conversation_id=? AND status IN ('requested','in_progress')",
+                (workspace_id, conversation_id),
+            ).fetchone()
+        assert row is not None
+        return self._row_to_handoff(row), bool(cursor.rowcount)
+
+    def list_handoffs(
+        self, workspace_id: str, *, status: str | None = None, page: int = 1, page_size: int = 50
+    ) -> tuple[list[HandoffRequest], int]:
+        clauses, params = ["workspace_id = ?"], [workspace_id]
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
+        where = " AND ".join(clauses)
+        with self._connection() as connection:
+            total = int(
+                connection.execute(f"SELECT COUNT(*) FROM handoff_requests WHERE {where}", params).fetchone()[
+                    0
+                ]
+            )
+            rows = connection.execute(
+                f"SELECT * FROM handoff_requests WHERE {where} ORDER BY CASE status WHEN 'requested' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END, created_at, id LIMIT ? OFFSET ?",
+                (*params, page_size, (page - 1) * page_size),
+            ).fetchall()
+        return [self._row_to_handoff(row) for row in rows], total
+
+    def update_handoff_status(self, workspace_id: str, handoff_id: str, status: str) -> HandoffRequest | None:
+        transitions = {
+            "requested": {"in_progress", "resolved", "cancelled"},
+            "in_progress": {"resolved", "cancelled"},
+            "resolved": set(),
+            "cancelled": set(),
+        }
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM handoff_requests WHERE workspace_id=? AND id=?", (workspace_id, handoff_id)
+            ).fetchone()
+            if row is None:
+                return None
+            if status not in transitions.get(str(row["status"]), set()):
+                raise ValueError("Invalid handoff status transition.")
+            now = self._now().isoformat()
+            resolved = now if status in {"resolved", "cancelled"} else None
+            connection.execute(
+                "UPDATE handoff_requests SET status=?,updated_at=?,resolved_at=? WHERE workspace_id=? AND id=?",
+                (status, now, resolved, workspace_id, handoff_id),
+            )
+            row = connection.execute(
+                "SELECT * FROM handoff_requests WHERE workspace_id=? AND id=?", (workspace_id, handoff_id)
+            ).fetchone()
+        return self._row_to_handoff(row)
+
+    def document_deletion_candidate(
+        self, workspace_id: str, document_id: str
+    ) -> DocumentDeletionCandidate | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM documents WHERE workspace_id=? AND id=?", (workspace_id, document_id)
+            ).fetchone()
+            if row is None:
+                return None
+            vectors = [
+                str(item[0])
+                for item in connection.execute(
+                    "SELECT vector_id FROM document_chunks WHERE document_id=?", (document_id,)
+                )
+            ]
+        return DocumentDeletionCandidate(self._row_to_document(row), vectors)
+
+    def delete_document_metadata(self, workspace_id: str, document_id: str) -> bool:
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "DELETE FROM documents WHERE workspace_id=? AND id=?", (workspace_id, document_id)
+            )
+        return bool(cursor.rowcount)
+
     def _finish_assistant_message(
         self,
         workspace_id: str,
@@ -734,9 +1063,7 @@ class MetadataStore:
                 (workspace_id, message_id),
             ).fetchone()
             if row is not None:
-                self._touch_conversation(
-                    connection, workspace_id, str(row["conversation_id"]), now
-                )
+                self._touch_conversation(connection, workspace_id, str(row["conversation_id"]), now)
         return self._row_to_message(row) if row else None
 
     @staticmethod
@@ -854,9 +1181,7 @@ class MetadataStore:
             created_at=cls._parse_datetime(str(row["created_at"])) or cls._now(),
             updated_at=cls._parse_datetime(str(row["updated_at"])) or cls._now(),
             last_message_at=(
-                cls._parse_datetime(str(row["last_message_at"]))
-                if row["last_message_at"]
-                else None
+                cls._parse_datetime(str(row["last_message_at"])) if row["last_message_at"] else None
             ),
         )
 
@@ -870,18 +1195,12 @@ class MetadataStore:
             role=str(row["role"]),
             status=str(row["status"]),
             content=str(row["content"]) if row["content"] is not None else None,
-            client_message_id=(
-                str(row["client_message_id"]) if row["client_message_id"] else None
-            ),
-            parent_message_id=(
-                str(row["parent_message_id"]) if row["parent_message_id"] else None
-            ),
+            client_message_id=(str(row["client_message_id"]) if row["client_message_id"] else None),
+            parent_message_id=(str(row["parent_message_id"]) if row["parent_message_id"] else None),
             error_message=str(row["error_message"]) if row["error_message"] else None,
             created_at=cls._parse_datetime(str(row["created_at"])) or cls._now(),
             updated_at=cls._parse_datetime(str(row["updated_at"])) or cls._now(),
-            completed_at=(
-                cls._parse_datetime(str(row["completed_at"])) if row["completed_at"] else None
-            ),
+            completed_at=(cls._parse_datetime(str(row["completed_at"])) if row["completed_at"] else None),
         )
 
     @classmethod
@@ -900,6 +1219,27 @@ class MetadataStore:
         )
 
     @classmethod
+    def _row_to_handoff(cls, row: sqlite3.Row, prefix: str = "") -> HandoffRequest:
+        def value(name: str):
+            key = f"{prefix}{name}" if prefix else name
+            return row[key]
+
+        workspace_id = str(row["workspace_id"])
+        conversation_id = str(row["id"]) if prefix else str(row["conversation_id"])
+        return HandoffRequest(
+            id=str(value("id")),
+            workspace_id=workspace_id,
+            conversation_id=conversation_id,
+            user_id=str(value("user_id")) if value("user_id") else None,
+            status=str(value("status")),
+            reason=str(value("reason")) if value("reason") else None,
+            metadata=cls._load_json(value("metadata_json")),
+            created_at=cls._parse_datetime(str(value("created_at"))) or cls._now(),
+            updated_at=cls._parse_datetime(str(value("updated_at"))) or cls._now(),
+            resolved_at=(cls._parse_datetime(str(value("resolved_at"))) if value("resolved_at") else None),
+        )
+
+    @classmethod
     def _row_to_generation_run(cls, row: sqlite3.Row) -> GenerationRun:
         return GenerationRun(
             id=str(row["id"]),
@@ -911,9 +1251,7 @@ class MetadataStore:
             status=str(row["status"]),
             prompt_tokens=int(row["prompt_tokens"]) if row["prompt_tokens"] is not None else None,
             completion_tokens=(
-                int(row["completion_tokens"])
-                if row["completion_tokens"] is not None
-                else None
+                int(row["completion_tokens"]) if row["completion_tokens"] is not None else None
             ),
             total_tokens=int(row["total_tokens"]) if row["total_tokens"] is not None else None,
             latency_ms=int(row["latency_ms"]) if row["latency_ms"] is not None else None,
@@ -922,7 +1260,5 @@ class MetadataStore:
             metadata=cls._load_json(row["metadata_json"]),
             error_message=str(row["error_message"]) if row["error_message"] else None,
             created_at=cls._parse_datetime(str(row["created_at"])) or cls._now(),
-            finished_at=(
-                cls._parse_datetime(str(row["finished_at"])) if row["finished_at"] else None
-            ),
+            finished_at=(cls._parse_datetime(str(row["finished_at"])) if row["finished_at"] else None),
         )

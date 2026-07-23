@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Protocol
 
 from app.config import Settings
 from app.llm.types import GenerationResult
-from app.rag.prompting import build_messages
+from app.rag.prompting import build_messages, format_support_contacts
 from app.services.metadata import MetadataStore
 
 _CITATION = re.compile(r"\[S(\d+)]")
@@ -37,6 +38,14 @@ class ChatResult:
     answer: str
     sources: list[dict]
     generation: GenerationResult | None = None
+
+
+class ChatGenerationError(RuntimeError):
+    """A model generation attempt failed after retrieval completed."""
+
+    def __init__(self, latency_ms: int):
+        super().__init__("The chat provider failed to generate a response.")
+        self.latency_ms = latency_ms
 
 
 def _history_aware_query(message: str, history: list[dict[str, str]]) -> str:
@@ -78,17 +87,27 @@ class ChatService:
         self.chat = chat
         self.settings = settings
 
-    def _unknown_response(self, message: str, history: list[dict[str, str]]) -> str:
-        base = (
-            f"در منابع فعلی {self.settings.company_name} اطلاعات کافی برای پاسخ دقیق به این سؤال پیدا نکردم."
+    def _support_contacts(self) -> str:
+        return format_support_contacts(
+            self.settings.support_email,
+            self.settings.support_phone,
+            self.settings.support_url,
         )
+
+    def _unknown_response(self, message: str, history: list[dict[str, str]]) -> str:
+        base = "متأسفم، در حال حاضر نمی‌توانم پاسخ دقیقی برای این مورد ارائه کنم."
+        contacts = self._support_contacts()
+        if contacts:
+            return f"{base}\n\nبرای بررسی دقیق‌تر، لطفاً از یکی از راه‌های رسمی زیر با پشتیبانی ما در تماس باشید:\n{contacts}"
         if len(message.split()) <= 3 and not history:
             return f"{base} لطفاً موضوع یا بخش موردنظرتان را کمی دقیق‌تر بفرمایید."
-        return base
+        return f"{base} اگر جزئیات بیشتری بفرمایید، موضوع را دقیق‌تر بررسی می‌کنم."
 
-    def _deterministic_response(self, message: str) -> str | None:
+    def _deterministic_response(self, message: str, history: list[dict[str, str]]) -> str | None:
         text = message.strip()
         if _GREETING.fullmatch(text):
+            if any(item.get("role") == "assistant" for item in history):
+                return "سلام! بفرمایید؛ دربارهٔ کدام بخش از خدمات می‌توانم راهنمایی‌تان کنم؟"
             return f"سلام! من {self.settings.assistant_name}، دستیار پشتیبانی {self.settings.company_name} هستم. چطور می‌توانم کمک کنم؟"
         if _THANKS.fullmatch(text):
             return "خواهش می‌کنم. اگر پرسش دیگری دارید، در خدمتم."
@@ -101,7 +120,7 @@ class ChatService:
         return result.answer, result.sources
 
     def answer_detailed(self, message: str, history: list[dict[str, str]], top_k: int) -> ChatResult:
-        if response := self._deterministic_response(message):
+        if response := self._deterministic_response(message, history):
             return ChatResult(answer=response, sources=[])
         retrieval_query = _history_aware_query(message, history)
         query_vector = self.embeddings.embed([retrieval_query])
@@ -146,15 +165,21 @@ class ChatService:
             return ChatResult(answer=self._unknown_response(message, history), sources=[])
 
         normalized_history = [(item["role"], item["content"]) for item in history if item.get("content")]
-        generation = self.chat.generate(
-            build_messages(
-                message,
-                contexts,
-                normalized_history,
-                assistant_name=self.settings.assistant_name,
-                company_name=self.settings.company_name,
+        started = perf_counter()
+        try:
+            generation = self.chat.generate(
+                build_messages(
+                    message,
+                    contexts,
+                    normalized_history,
+                    assistant_name=self.settings.assistant_name,
+                    company_name=self.settings.company_name,
+                    support_contacts=self._support_contacts(),
+                )
             )
-        )
+        except Exception as error:
+            latency_ms = round((perf_counter() - started) * 1000)
+            raise ChatGenerationError(latency_ms) from error
         answer = generation.text.strip()
         if not answer:
             return ChatResult(

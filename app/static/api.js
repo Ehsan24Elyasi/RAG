@@ -61,13 +61,42 @@ export const conversationApi = {
       signal,
     },
   ),
+  requestHandoff: (token, conversationId, reason, signal) => requestJson(
+    `/api/conversations/${encodeURIComponent(conversationId)}/handoff`,
+    { method: "POST", token, body: { reason: reason || null }, signal },
+  ),
 };
 
 export const configApi = (signal) => requestJson("/api/config", { signal });
 
+export const localWidgetBootstrapApi = (signal) => requestJson("/api/dev/widget-bootstrap", {
+  method: "POST",
+  signal,
+});
+
 export const adminApi = {
   status: (token) => requestJson("/api/admin/status", { token }),
+  metrics: (token, days = 30) => requestJson(`/api/admin/metrics?days=${encodeURIComponent(days)}`, { token }),
+  conversations: (token, filters = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") query.set(key, value);
+    });
+    return requestJson(`/api/admin/conversations?${query}`, { token });
+  },
+  conversation: (token, id) => requestJson(`/api/admin/conversations/${encodeURIComponent(id)}`, { token }),
+  handoffs: (token, filters = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") query.set(key, value);
+    });
+    return requestJson(`/api/admin/handoffs?${query}`, { token });
+  },
+  updateHandoff: (token, id, status) => requestJson(`/api/admin/handoffs/${encodeURIComponent(id)}`, {
+    method: "PATCH", token, body: { status },
+  }),
   documents: (token) => requestJson("/api/admin/documents", { token }),
+  deleteDocument: (token, id) => requestJson(`/api/admin/documents/${encodeURIComponent(id)}`, { method: "DELETE", token }),
   crawl: (token, body) => requestJson("/api/admin/crawl", { method: "POST", token, body }),
   upload: (token, file) => {
     const form = new FormData();

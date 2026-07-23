@@ -40,51 +40,96 @@
         <div><h1>دانش‌نامه پشتیبانی</h1><p>فایل‌ها و صفحات راهنما را به سامانه اضافه و وضعیت پردازش را بررسی کنید.</p></div>
         <span class="status-badge" id="status-badge" data-state="loading"><span class="status-dot" aria-hidden="true"></span><span id="system-status">در حال بررسی</span></span>
       </div>
+      <p class="inline-banner dashboard-banner" id="dashboard-banner" role="status" aria-live="polite" hidden></p>
 
-      <section class="status-grid" aria-label="خلاصه وضعیت">
-        <article class="status-tile"><span class="status-tile-label">وضعیت سرویس</span><strong class="status-tile-value textual" id="status-value">—</strong><p class="status-tile-help">اتصال API و پایگاه داده</p></article>
-        <article class="status-tile"><span class="status-tile-label">اسناد فعال</span><strong class="status-tile-value" id="documents-value">۰</strong><p class="status-tile-help">فایل و صفحه وب</p></article>
-        <article class="status-tile"><span class="status-tile-label">بخش‌های نمایه‌شده</span><strong class="status-tile-value" id="chunks-value">۰</strong><p class="status-tile-help">قطعه‌های قابل جست‌وجو</p></article>
-        <article class="status-tile"><span class="status-tile-label">ارائه‌دهنده‌ها</span><strong class="status-tile-value textual" id="providers-value" dir="auto">—</strong><p class="status-tile-help">گفت‌وگو / بردارسازی</p></article>
-      </section>
+      <div class="admin-layout">
+        <aside class="admin-sidebar" aria-label="ناوبری پنل مدیریت">
+          <nav class="admin-nav">
+            <a href="#overview-section" aria-current="true">نمای کلی و آمار</a>
+            <a href="#conversations-section">گفتگوها</a>
+            <a href="#handoffs-section">پشتیبانی انسانی</a>
+            <a href="#documents-section">اسناد</a>
+            <a href="#ingestion-section">خزش و بارگذاری</a>
+          </nav>
+        </aside>
 
-      <div class="admin-grid">
-        <div class="admin-stack">
-          <section class="admin-card">
-            <div class="admin-card-heading"><div><h2>افزودن صفحه وب</h2><p>خزشگر فقط صفحه‌های عمومی و هم‌دامنه را پردازش می‌کند.</p></div></div>
-            <form class="admin-card-body" id="crawl-form">
-              <div class="field"><label for="crawl-url">نشانی صفحه</label><input class="input" id="crawl-url" type="url" dir="ltr" required placeholder="https://example.com/help"></div>
-              <div class="form-row">
-                <div class="field"><label for="crawl-pages">حداکثر صفحه</label><input class="input" id="crawl-pages" type="number" min="1" max="50" value="5"></div>
-                <div class="field"><label for="crawl-depth">عمق لینک</label><input class="input" id="crawl-depth" type="number" min="0" max="5" value="1"></div>
+        <div class="admin-content">
+          <section class="admin-section" id="overview-section" aria-labelledby="overview-title">
+            <h2 class="admin-section-title" id="overview-title">نمای کلی و آمار</h2>
+            <div class="status-grid" aria-label="خلاصه وضعیت">
+              <article class="status-tile"><span class="status-tile-label">وضعیت سرویس</span><strong class="status-tile-value textual" id="status-value">—</strong><p class="status-tile-help">اتصال API و پایگاه داده</p></article>
+              <article class="status-tile"><span class="status-tile-label">اسناد فعال</span><strong class="status-tile-value" id="documents-value">۰</strong><p class="status-tile-help">فایل و صفحه وب</p></article>
+              <article class="status-tile"><span class="status-tile-label">بخش‌های نمایه‌شده</span><strong class="status-tile-value" id="chunks-value">۰</strong><p class="status-tile-help">قطعه‌های قابل جست‌وجو</p></article>
+              <article class="status-tile"><span class="status-tile-label">ارائه‌دهنده‌ها</span><strong class="status-tile-value textual" id="providers-value" dir="auto">—</strong><p class="status-tile-help">گفت‌وگو / بردارسازی</p></article>
+            </div>
+            <section class="admin-card operations-dashboard" aria-labelledby="usage-title" id="metrics-section">
+              <div class="admin-card-heading"><div><h2 id="usage-title">میزان استفاده</h2><p id="metrics-range">آمار گفتگوهای احراز هویت‌شده در بازهٔ انتخابی</p></div><label class="compact-filter">بازه <select class="input" id="metrics-days"><option value="7">۷ روز</option><option value="30" selected>۳۰ روز</option><option value="90">۹۰ روز</option></select></label></div>
+              <div class="metrics-body">
+                <section class="metric-group" aria-labelledby="period-metrics-title"><h3 id="period-metrics-title">در بازهٔ انتخابی</h3><div class="metric-grid">
+                  <article class="status-tile"><span class="status-tile-label">گفتگوهای جدید</span><strong class="status-tile-value" id="metric-conversations">۰</strong><p class="status-tile-help">گفتگوهای سروری ایجادشده</p></article>
+                  <article class="status-tile"><span class="status-tile-label">پیام کاربران</span><strong class="status-tile-value" id="metric-user-messages">۰</strong><p class="status-tile-help">پیام‌های ثبت‌شده کاربران</p></article>
+                  <article class="status-tile"><span class="status-tile-label">پاسخ‌های تکمیل‌شده</span><strong class="status-tile-value" id="metric-assistant-messages">۰</strong><p class="status-tile-help">پاسخ‌های assistant با وضعیت completed</p></article>
+                  <article class="status-tile"><span class="status-tile-label">درخواست موفق مدل</span><strong class="status-tile-value" id="metric-generation-success">۰</strong></article>
+                  <article class="status-tile"><span class="status-tile-label">درخواست ناموفق مدل</span><strong class="status-tile-value" id="metric-generation-failed">۰</strong></article>
+                  <article class="status-tile"><span class="status-tile-label">میانگین زمان پاسخ موفق</span><strong class="status-tile-value" id="metric-latency">—</strong><p class="status-tile-help">فقط generation موفق provider</p></article>
+                  <article class="status-tile"><span class="status-tile-label">توکن ورودی گزارش‌شده</span><strong class="status-tile-value" id="metric-prompt-tokens">۰</strong></article>
+                  <article class="status-tile"><span class="status-tile-label">توکن خروجی گزارش‌شده</span><strong class="status-tile-value" id="metric-completion-tokens">۰</strong></article>
+                  <article class="status-tile"><span class="status-tile-label">کل توکن گزارش‌شده</span><strong class="status-tile-value" id="metric-period-tokens">۰</strong></article>
+                  <article class="status-tile"><span class="status-tile-label">پاسخ موفق بدون گزارش توکن</span><strong class="status-tile-value" id="metric-unreported">۰</strong><p class="status-tile-help">provider مقدار usage برنگردانده است</p></article>
+                  <article class="status-tile"><span class="status-tile-label">درخواست پشتیبانی حل‌شده</span><strong class="status-tile-value" id="metric-resolved-handoffs">۰</strong></article>
+                </div></section>
+                <section class="metric-group metric-snapshot" aria-labelledby="snapshot-metrics-title"><h3 id="snapshot-metrics-title">وضعیت فعلی و از ابتدای ثبت</h3><div class="metric-grid compact">
+                  <article class="status-tile"><span class="status-tile-label">درخواست پشتیبانی باز اکنون</span><strong class="status-tile-value" id="metric-open-handoffs">۰</strong><p class="status-tile-help">snapshot فعلی؛ مستقل از بازه</p></article>
+                  <article class="status-tile"><span class="status-tile-label">کل توکن گزارش‌شده از ابتدا</span><strong class="status-tile-value" id="metric-lifetime-tokens">۰</strong><p class="status-tile-help">فقط usage ثبت‌شده provider</p></article>
+                </div></section>
+                <p class="metrics-note">این آمار فقط گفتگوهای احراز هویت‌شده و ذخیره‌شده را پوشش می‌دهد؛ درخواست‌های legacy مسیر <code>/api/chat</code> محاسبه نمی‌شوند. بازه‌ها rolling و بر مبنای UTC هستند.</p>
               </div>
-              <button class="button button-primary" type="submit" id="crawl-button">شروع خزش</button>
-            </form>
+            </section>
           </section>
 
-          <section class="admin-card">
-            <div class="admin-card-heading"><div><h2>بارگذاری فایل</h2><p>فایل‌های TXT، PDF و JSON را انتخاب یا در کادر رها کنید.</p></div></div>
-            <div class="admin-card-body">
-              <input class="sr-only" id="file-input" type="file" multiple accept=".txt,.pdf,.json,text/plain,application/pdf,application/json">
-              <button class="upload-dropzone" id="dropzone" type="button">
-                <span aria-hidden="true">⇧</span><strong>فایل را اینجا رها کنید</strong><p>یا برای انتخاب فایل کلیک کنید</p><span class="button button-secondary">انتخاب فایل</span>
-              </button>
-              <div class="file-queue" id="file-queue"></div>
+          <section class="admin-section admin-card" id="conversations-section" aria-labelledby="conversations-title">
+            <div class="admin-card-heading"><div><h2 id="conversations-title">گفتگوهای کاربران</h2><p>آخرین گفتگوها و متن کامل پیام‌ها</p></div><button class="button button-quiet" type="button" id="conversations-refresh">تازه‌سازی</button></div>
+            <div class="conversation-admin-list" id="conversations-list"><p class="loading-state">در حال دریافت گفتگوها…</p></div>
+          </section>
+
+          <section class="admin-section admin-card" id="handoffs-section" aria-labelledby="handoffs-title">
+            <div class="admin-card-heading"><div><h2 id="handoffs-title">پشتیبانی انسانی</h2><p>درخواست‌های جدید و در حال بررسی</p></div><button class="button button-quiet" type="button" id="handoffs-refresh">تازه‌سازی</button></div>
+            <div class="handoff-admin-list" id="handoffs-list"><p class="loading-state">در حال دریافت درخواست‌ها…</p></div>
+          </section>
+
+          <section class="admin-section admin-card documents-card" id="documents-section" aria-labelledby="documents-title">
+            <div class="admin-card-heading"><div><h2 id="documents-title">اسناد دانش‌نامه</h2><p>منابعی که در پاسخ‌گویی استفاده می‌شوند</p></div><div class="documents-actions"><button class="button button-quiet" id="documents-refresh" type="button">تازه‌سازی</button></div></div>
+            <div class="documents-list" id="documents-list"><p class="loading-state">در حال دریافت اسناد…</p></div>
+          </section>
+
+          <section class="admin-section" id="ingestion-section" aria-labelledby="ingestion-title">
+            <h2 class="admin-section-title" id="ingestion-title">خزش و بارگذاری</h2>
+            <div class="admin-ingestion-grid">
+              <section class="admin-card">
+                <div class="admin-card-heading"><div><h2>افزودن صفحه وب</h2><p>خزشگر فقط صفحه‌های عمومی و هم‌دامنه را پردازش می‌کند.</p></div></div>
+                <form class="admin-card-body" id="crawl-form">
+                  <div class="field"><label for="crawl-url">نشانی صفحه</label><input class="input" id="crawl-url" type="url" dir="ltr" required placeholder="https://example.com/help"></div>
+                  <div class="form-row"><div class="field"><label for="crawl-pages">حداکثر صفحه</label><input class="input" id="crawl-pages" type="number" min="1" max="50" value="5"></div><div class="field"><label for="crawl-depth">عمق لینک</label><input class="input" id="crawl-depth" type="number" min="0" max="5" value="1"></div></div>
+                  <button class="button button-primary" type="submit" id="crawl-button">شروع خزش</button>
+                </form>
+              </section>
+              <section class="admin-card">
+                <div class="admin-card-heading"><div><h2>بارگذاری فایل</h2><p>فایل‌های TXT، PDF و JSON را انتخاب یا در کادر رها کنید.</p></div></div>
+                <div class="admin-card-body">
+                  <input class="sr-only" id="file-input" type="file" multiple accept=".txt,.pdf,.json,text/plain,application/pdf,application/json">
+                  <button class="upload-dropzone" id="dropzone" type="button"><span aria-hidden="true">⇧</span><strong>فایل را اینجا رها کنید</strong><p>یا برای انتخاب فایل کلیک کنید</p><span class="button button-secondary">انتخاب فایل</span></button>
+                  <div class="file-queue" id="file-queue"></div>
+                </div>
+              </section>
             </div>
           </section>
-
-          <section class="admin-card">
-            <div class="admin-card-heading"><div><h2>پردازش‌های اخیر</h2><p>نتیجه بارگذاری و خزش‌های اخیر</p></div></div>
-            <div class="operation-list" id="operation-list"><p class="loading-state">هنوز عملیاتی ثبت نشده است.</p></div>
-          </section>
         </div>
-
-        <section class="admin-card documents-card">
-          <div class="admin-card-heading"><div><h2>اسناد دانش‌نامه</h2><p>منابعی که در پاسخ‌گویی استفاده می‌شوند</p></div><div class="documents-actions"><button class="button button-quiet" id="documents-refresh" type="button">تازه‌سازی</button></div></div>
-          <p class="inline-banner" id="dashboard-banner" role="status" aria-live="polite" hidden></p>
-          <div class="documents-list" id="documents-list"><p class="loading-state">در حال دریافت اسناد…</p></div>
-        </section>
       </div>
+
+      <dialog class="admin-dialog" id="conversation-dialog" aria-labelledby="conversation-dialog-title">
+        <div class="admin-dialog-header"><div><h2 id="conversation-dialog-title">جزئیات گفتگو</h2><p id="conversation-user">—</p></div><button class="button button-quiet" id="conversation-dialog-close" type="button">بستن</button></div>
+        <div class="admin-transcript" id="admin-transcript"></div>
+      </dialog>
     </main>
   </div>
 
@@ -100,18 +145,24 @@
     const keyInput = $("#admin-key");
     const unlockError = $("#unlock-error");
     const dashboardBanner = $("#dashboard-banner");
-    const refreshButtons = [$("#refresh-button"), $("#documents-refresh")];
+    const conversationsList = $("#conversations-list");
+    const handoffsList = $("#handoffs-list");
+    const conversationDialog = $("#conversation-dialog");
     const statusBadge = $("#status-badge");
     const documentsList = $("#documents-list");
-    const operationList = $("#operation-list");
+    const sections = {
+      status: $("#overview-section"), metrics: $("#metrics-section"), conversations: $("#conversations-section"),
+      handoffs: $("#handoffs-section"), documents: $("#documents-section"),
+    };
     const fileQueue = $("#file-queue");
     const fileInput = $("#file-input");
     const dropzone = $("#dropzone");
     let token = sessionStorage.getItem(KEY) || "";
     let busy = false;
 
-    const fa = value => Number(value || 0).toLocaleString("fa-IR");
-    const date = value => value ? new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+    const fa = value => value === null || value === undefined ? "—" : Number(value).toLocaleString("fa-IR");
+    const date = value => value ? new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(value)) : "—";
+    const latency = value => value === null || value === undefined ? "—" : value < 1000 ? `${fa(Math.round(value))} ms` : `${(value / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 2 })} s`;
     const safeDetail = error => error instanceof ApiError ? error.message : "عملیات انجام نشد. دوباره تلاش کنید.";
 
     function setDashboardBanner(message = "", kind = "error") {
@@ -121,29 +172,87 @@
       dashboardBanner.hidden = !message;
     }
     function setDashboardBusy(value) {
-      refreshButtons.forEach(button => { button.disabled = value; });
+      $("#refresh-button").disabled = value;
       adminShell.setAttribute("aria-busy", String(value));
-      if (value) {
-        statusBadge.dataset.state = "loading";
-        $("#system-status").textContent = "در حال بررسی";
-      }
+    }
+    function setSectionState(name, state, message = "") {
+      const section = sections[name];
+      if (!section) return;
+      section.setAttribute("aria-busy", String(state === "loading"));
+      section.dataset.loadState = state;
+      let notice = section.querySelector(":scope > .section-notice");
+      if (message) {
+        if (!notice) { notice = document.createElement("p"); notice.className = "section-notice"; notice.setAttribute("role", "alert"); section.prepend(notice); }
+        notice.textContent = message;
+      } else if (notice) notice.remove();
+    }
+    function handleAuthFailure(error) {
+      if (!(error instanceof ApiError) || ![401, 403].includes(error.status)) return false;
+      sessionStorage.removeItem(KEY); token = ""; keyInput.value = "";
+      showUnlock("کلید مدیریت معتبر نیست.");
+      return true;
     }
     function showPanel() { unlockScreen.hidden = true; adminShell.hidden = false; }
     function showUnlock(message = "") { adminShell.hidden = true; unlockScreen.hidden = false; unlockError.textContent = message; unlockError.hidden = !message; keyInput.focus(); }
     function logout() { sessionStorage.removeItem(KEY); token = ""; keyInput.value = ""; showUnlock(); }
 
-    function renderOperations(runs = []) {
-      operationList.replaceChildren();
-      if (!runs.length) { const empty = document.createElement("p"); empty.className = "loading-state"; empty.textContent = "هنوز عملیاتی ثبت نشده است."; operationList.append(empty); return; }
-      runs.slice(0, 8).forEach(run => {
-        const item = document.createElement("article"); item.className = `operation ${run.status === "failed" ? "error" : ""}`;
-        const icon = document.createElement("span"); icon.className = "operation-icon"; icon.textContent = run.status === "failed" ? "!" : "✓";
-        const content = document.createElement("div"); content.className = "operation-content";
-        const title = document.createElement("p"); title.className = "operation-title"; title.dir = "auto"; title.textContent = run.source_label || run.kind || "پردازش محتوا";
-        const detail = document.createElement("p"); detail.className = "operation-detail"; detail.textContent = run.error_message || `${fa(run.documents_processed)} سند و ${fa(run.chunks_created)} بخش · ${run.status === "succeeded" ? "موفق" : run.status}`;
-        content.append(title, detail);
-        const time = document.createElement("time"); time.className = "operation-time"; time.textContent = date(run.finished_at || run.created_at);
-        item.append(icon, content, time); operationList.append(item);
+    function renderMetrics(metrics) {
+      $("#metric-conversations").textContent = fa(metrics.new_conversations);
+      $("#metric-user-messages").textContent = fa(metrics.user_messages);
+      $("#metric-assistant-messages").textContent = fa(metrics.assistant_messages);
+      $("#metric-generation-success").textContent = fa(metrics.successful_generations);
+      $("#metric-generation-failed").textContent = fa(metrics.failed_generations);
+      $("#metric-latency").textContent = latency(metrics.average_latency_ms);
+      $("#metric-prompt-tokens").textContent = fa(metrics.prompt_tokens);
+      $("#metric-completion-tokens").textContent = fa(metrics.completion_tokens);
+      $("#metric-period-tokens").textContent = fa(metrics.total_tokens);
+      $("#metric-unreported").textContent = fa(metrics.unreported_runs);
+      $("#metric-resolved-handoffs").textContent = fa(metrics.resolved_handoffs);
+      $("#metric-open-handoffs").textContent = fa(metrics.open_handoffs);
+      $("#metric-lifetime-tokens").textContent = fa(metrics.lifetime_total_tokens);
+      $("#metrics-range").textContent = `از ${date(metrics.start)} تا ${date(metrics.end)} (UTC)`;
+    }
+
+    async function openConversation(id) {
+      const detail = await adminApi.conversation(token, id);
+      $("#conversation-user").textContent = detail.user.display_name || detail.user.external_id;
+      const transcript = $("#admin-transcript"); transcript.replaceChildren();
+      detail.messages.forEach(message => {
+        const item = document.createElement("article"); item.className = `admin-message ${message.role}`;
+        const meta = document.createElement("small"); meta.textContent = `${message.role === "user" ? "کاربر" : "پاسخ‌یار"} · ${date(message.created_at)}`;
+        const content = document.createElement("p"); content.dir = "auto"; content.textContent = message.content || message.error_message || "پیام بدون محتوا";
+        item.append(meta, content);
+        if (message.generation) { const usage = document.createElement("small"); usage.textContent = `${fa(message.generation.total_tokens)} توکن · ${fa(message.generation.latency_ms)} میلی‌ثانیه`; item.append(usage); }
+        transcript.append(item);
+      });
+      conversationDialog.showModal();
+    }
+
+    function renderConversations(payload) {
+      conversationsList.replaceChildren();
+      if (!payload.conversations?.length) { const empty = document.createElement("p"); empty.className = "loading-state"; empty.textContent = "هنوز گفتگویی ثبت نشده است."; conversationsList.append(empty); return; }
+      payload.conversations.forEach(conversation => {
+        const row = document.createElement("button"); row.type = "button"; row.className = "admin-list-row";
+        const body = document.createElement("span"); const title = document.createElement("strong"); title.textContent = conversation.user.display_name || conversation.user.external_id;
+        const preview = document.createElement("small"); preview.dir = "auto"; preview.textContent = conversation.last_message_preview || conversation.title || "بدون پیام"; body.append(title, preview);
+        const stats = document.createElement("span"); stats.className = "admin-list-stats"; stats.textContent = `${fa(conversation.message_count)} پیام · ${fa(conversation.token_total)} توکن`;
+        row.append(body, stats); row.addEventListener("click", () => openConversation(conversation.id).catch(error => { if (!handleAuthFailure(error)) setDashboardBanner(safeDetail(error)); })); conversationsList.append(row);
+      });
+    }
+
+    function renderHandoffs(payload) {
+      handoffsList.replaceChildren();
+      const activeItems = (payload.handoffs || []).filter(item => ["requested", "in_progress"].includes(item.status));
+      if (!activeItems.length) { const empty = document.createElement("p"); empty.className = "loading-state"; empty.textContent = "درخواست بازی وجود ندارد."; handoffsList.append(empty); return; }
+      activeItems.forEach(handoff => {
+        const row = document.createElement("article"); row.className = "handoff-row";
+        const body = document.createElement("div"); const title = document.createElement("strong"); title.textContent = handoff.status === "requested" ? "درخواست جدید" : "در حال بررسی";
+        const reason = document.createElement("p"); reason.dir = "auto"; reason.textContent = handoff.reason || "بدون توضیح"; body.append(title, reason);
+        const actions = document.createElement("div"); actions.className = "handoff-actions";
+        const view = document.createElement("button"); view.className = "button button-quiet"; view.textContent = "مشاهده گفتگو"; view.addEventListener("click", () => openConversation(handoff.conversation_id).catch(error => { if (!handleAuthFailure(error)) setDashboardBanner(safeDetail(error)); })); actions.append(view);
+        const next = document.createElement("button"); next.className = "button button-secondary"; next.textContent = handoff.status === "requested" ? "شروع بررسی" : "حل شد";
+        next.addEventListener("click", async () => { try { await adminApi.updateHandoff(token, handoff.id, handoff.status === "requested" ? "in_progress" : "resolved"); await Promise.allSettled([loadHandoffs(), loadMetrics()]); } catch (error) { if (!handleAuthFailure(error)) setDashboardBanner(safeDetail(error)); } }); actions.append(next);
+        row.append(body, actions); handoffsList.append(row);
       });
     }
 
@@ -162,39 +271,59 @@
         const type = document.createElement("span"); type.className = "document-type"; type.textContent = doc.source_type === "web" ? "وب" : "فایل";
         const count = document.createElement("span"); count.className = "document-count"; count.textContent = `${fa(doc.chunk_count)} بخش`;
         const updated = document.createElement("time"); updated.className = "document-date"; updated.textContent = date(doc.updated_at || doc.created_at);
-        row.append(name, type, count, updated); documentsList.append(row);
+        row.append(name, type, count, updated);
+        if (doc.source_type === "upload") {
+          const remove = document.createElement("button"); remove.type = "button"; remove.className = "button button-danger document-delete"; remove.textContent = "حذف";
+          remove.addEventListener("click", async () => {
+            if (!window.confirm(`فایل «${doc.source_name}» حذف شود؟`)) return;
+            remove.disabled = true;
+            try { await adminApi.deleteDocument(token, doc.id); await Promise.allSettled([loadDocuments(), loadStatus()]); setDashboardBanner("فایل با موفقیت حذف شد.", "success"); }
+            catch (error) { remove.disabled = false; if (!handleAuthFailure(error)) setDashboardBanner(safeDetail(error)); }
+          });
+          row.append(remove);
+        }
+        documentsList.append(row);
       });
     }
 
-    async function fetchDashboard() {
-      setDashboardBanner();
-      const [status, documents] = await Promise.all([adminApi.status(token), adminApi.documents(token)]);
-      const isReady = status.status === "ok";
-      $("#status-value").textContent = isReady ? "آماده" : "نیازمند بررسی";
-      $("#system-status").textContent = isReady ? "سامانه آماده است" : "نیازمند بررسی";
-      statusBadge.dataset.state = isReady ? "ok" : "error";
-      $("#documents-value").textContent = fa(status.active_documents);
-      $("#chunks-value").textContent = fa(status.indexed_chunks);
-      $("#providers-value").textContent = `${status.chat_provider || "—"} / ${status.embedding_provider || "—"}`;
-      renderOperations(status.recent_runs || []); renderDocuments(documents); showPanel();
+    async function loadSection(name, request, render) {
+      setSectionState(name, "loading");
+      try {
+        const payload = await request();
+        render(payload);
+        setSectionState(name, "ready");
+        return payload;
+      } catch (error) {
+        if (!handleAuthFailure(error)) setSectionState(name, "error", safeDetail(error));
+        throw error;
+      }
     }
+
+    function loadStatus() {
+      statusBadge.dataset.state = "loading"; $("#system-status").textContent = "در حال بررسی";
+      return loadSection("status", () => adminApi.status(token), status => {
+        const isReady = status.status === "ok";
+        $("#status-value").textContent = isReady ? "آماده" : "نیازمند بررسی";
+        $("#system-status").textContent = isReady ? "سامانه آماده است" : "نیازمند بررسی";
+        statusBadge.dataset.state = isReady ? "ok" : "error";
+        $("#documents-value").textContent = fa(status.active_documents);
+        $("#chunks-value").textContent = fa(status.indexed_chunks);
+        $("#providers-value").textContent = `${status.chat_provider || "—"} / ${status.embedding_provider || "—"}`;
+      }).catch(error => { if (!handleAuthFailure(error)) { statusBadge.dataset.state = "error"; $("#system-status").textContent = "ارتباط برقرار نشد"; } throw error; });
+    }
+    const loadMetrics = () => loadSection("metrics", () => adminApi.metrics(token, Number($("#metrics-days").value)), renderMetrics);
+    const loadConversations = () => loadSection("conversations", () => adminApi.conversations(token, { page_size: 20 }), renderConversations);
+    const loadHandoffs = () => loadSection("handoffs", () => adminApi.handoffs(token, { page_size: 50 }), renderHandoffs);
+    const loadDocuments = () => loadSection("documents", () => adminApi.documents(token), renderDocuments);
 
     async function loadDashboard() {
       if (!token || busy) return;
-      busy = true;
-      setDashboardBusy(true);
-      try { await fetchDashboard(); }
-      catch (error) {
-        if (error instanceof ApiError && [401, 403].includes(error.status)) {
-          sessionStorage.removeItem(KEY); token = ""; keyInput.value = "";
-          showUnlock("کلید مدیریت معتبر نیست.");
-        } else {
-          statusBadge.dataset.state = "error";
-          $("#system-status").textContent = "ارتباط برقرار نشد";
-          setDashboardBanner(safeDetail(error));
-        }
-        throw error;
-      } finally { busy = false; setDashboardBusy(false); }
+      busy = true; setDashboardBusy(true); setDashboardBanner(); showPanel();
+      const results = await Promise.allSettled([loadStatus(), loadMetrics(), loadConversations(), loadHandoffs(), loadDocuments()]);
+      busy = false; setDashboardBusy(false);
+      if (!token) throw results.find(result => result.status === "rejected")?.reason;
+      if (results.some(result => result.status === "rejected")) setDashboardBanner("بخشی از اطلاعات به‌روز نشد. خطای همان بخش را بررسی کنید.");
+      return results;
     }
 
     unlockForm.addEventListener("submit", async event => {
@@ -205,14 +334,18 @@
     });
     $("#logout-button").addEventListener("click", logout);
     $("#refresh-button").addEventListener("click", () => loadDashboard().catch(() => {}));
-    $("#documents-refresh").addEventListener("click", () => loadDashboard().catch(() => {}));
+    $("#documents-refresh").addEventListener("click", () => loadDocuments().catch(() => {}));
+    $("#conversations-refresh").addEventListener("click", () => loadConversations().catch(() => {}));
+    $("#handoffs-refresh").addEventListener("click", () => loadHandoffs().catch(() => {}));
+    $("#metrics-days").addEventListener("change", () => loadMetrics().catch(() => {}));
+    $("#conversation-dialog-close").addEventListener("click", () => conversationDialog.close());
 
     $("#crawl-form").addEventListener("submit", async event => {
       event.preventDefault(); const button = $("#crawl-button"); button.disabled = true; setDashboardBanner();
       try {
         const response = await adminApi.crawl(token, { url: $("#crawl-url").value.trim(), max_pages: Number($("#crawl-pages").value), max_depth: Number($("#crawl-depth").value) });
-        $("#crawl-url").value = ""; await fetchDashboard(); setDashboardBanner(`${fa(response.pages_visited)} صفحه پردازش شد.`, "success");
-      } catch (error) { setDashboardBanner(safeDetail(error)); } finally { button.disabled = false; }
+        $("#crawl-url").value = ""; await Promise.allSettled([loadDocuments(), loadStatus()]); setDashboardBanner(`${fa(response.pages_visited)} صفحه پردازش شد.`, "success");
+      } catch (error) { if (!handleAuthFailure(error)) setDashboardBanner(safeDetail(error)); } finally { button.disabled = false; }
     });
 
     async function uploadFiles(files) {
@@ -223,15 +356,29 @@
         const row = document.createElement("div"); row.className = "file-item"; const name = document.createElement("span"); name.className = "file-item-name"; name.dir = "auto"; name.textContent = file.name;
         const state = document.createElement("span"); state.className = "file-item-state"; state.textContent = "در حال ارسال"; row.append(name, state); fileQueue.append(row);
         try { const result = await adminApi.upload(token, file); state.textContent = result.unchanged ? "بدون تغییر" : `${fa(result.chunks_created)} بخش`; }
-        catch (error) { row.classList.add("error"); state.textContent = safeDetail(error); }
+        catch (error) { row.classList.add("error"); state.textContent = safeDetail(error); if (handleAuthFailure(error)) break; }
       }
-      fileInput.value = ""; await fetchDashboard().catch(error => setDashboardBanner(safeDetail(error)));
+      fileInput.value = "";
+      const results = await Promise.allSettled([loadDocuments(), loadStatus()]);
+      const failure = results.find(result => result.status === "rejected");
+      if (failure && token) setDashboardBanner(safeDetail(failure.reason));
     }
     dropzone.addEventListener("click", () => fileInput.click());
     fileInput.addEventListener("change", () => uploadFiles([...fileInput.files]));
     dropzone.addEventListener("dragover", event => { event.preventDefault(); dropzone.classList.add("is-dragover"); });
     dropzone.addEventListener("dragleave", () => dropzone.classList.remove("is-dragover"));
     dropzone.addEventListener("drop", event => { event.preventDefault(); dropzone.classList.remove("is-dragover"); uploadFiles([...event.dataTransfer.files]); });
+
+    const navLinks = [...document.querySelectorAll(".admin-nav a")];
+    const observedSections = navLinks.map(link => document.querySelector(link.hash)).filter(Boolean);
+    if ("IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(entries => {
+        const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        navLinks.forEach(link => link.hash === `#${visible.target.id}` ? link.setAttribute("aria-current", "true") : link.removeAttribute("aria-current"));
+      }, { rootMargin: "-18% 0px -65%", threshold: [0, .25, .5] });
+      observedSections.forEach(section => observer.observe(section));
+    }
 
     if (token) loadDashboard().catch(() => {}); else showUnlock();
   </script>

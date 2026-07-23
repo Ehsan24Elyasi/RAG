@@ -41,9 +41,7 @@ def _migration_001_catalogue(connection: sqlite3.Connection) -> None:
             UNIQUE(document_id, chunk_index)
         )"""
     )
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_chunks_document ON document_chunks(document_id)"
-    )
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_chunks_document ON document_chunks(document_id)")
     connection.execute(
         """CREATE TABLE IF NOT EXISTS ingestion_runs (
             id TEXT PRIMARY KEY,
@@ -81,16 +79,12 @@ def _migration_003_workspaces(connection: sqlite3.Connection) -> None:
         (DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_SLUG, "Default Workspace", now, now),
     )
     if "workspace_id" not in _columns(connection, "documents"):
-        connection.execute(
-            "ALTER TABLE documents ADD COLUMN workspace_id TEXT REFERENCES workspaces(id)"
-        )
+        connection.execute("ALTER TABLE documents ADD COLUMN workspace_id TEXT REFERENCES workspaces(id)")
     connection.execute(
         "UPDATE documents SET workspace_id = ? WHERE workspace_id IS NULL",
         (DEFAULT_WORKSPACE_ID,),
     )
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_documents_workspace ON documents(workspace_id)"
-    )
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_documents_workspace ON documents(workspace_id)")
     connection.execute(
         """CREATE UNIQUE INDEX IF NOT EXISTS uq_documents_workspace_source
            ON documents(workspace_id, source_key)"""
@@ -246,9 +240,7 @@ def _migration_004_conversations(connection: sqlite3.Connection) -> None:
 
 def _migration_005_message_parent(connection: sqlite3.Connection) -> None:
     if "parent_message_id" not in _columns(connection, "messages"):
-        connection.execute(
-            "ALTER TABLE messages ADD COLUMN parent_message_id TEXT REFERENCES messages(id)"
-        )
+        connection.execute("ALTER TABLE messages ADD COLUMN parent_message_id TEXT REFERENCES messages(id)")
     connection.execute(
         """CREATE UNIQUE INDEX IF NOT EXISTS uq_assistant_parent_message
            ON messages(parent_message_id)
@@ -302,6 +294,37 @@ def _migration_006_workspace_catalogue_keys(connection: sqlite3.Connection) -> N
     connection.execute("CREATE INDEX idx_chunks_document ON document_chunks(document_id)")
 
 
+def _migration_007_admin_operations(connection: sqlite3.Connection) -> None:
+    active = connection.execute(
+        """SELECT conversation_id, GROUP_CONCAT(id) AS ids
+           FROM handoff_requests WHERE status IN ('requested', 'in_progress')
+           GROUP BY conversation_id HAVING COUNT(*) > 1"""
+    ).fetchall()
+    now = _utc_now()
+    for row in active:
+        ids = str(row[1]).split(",")
+        keep = connection.execute(
+            f"SELECT id FROM handoff_requests WHERE id IN ({','.join('?' for _ in ids)}) "
+            "ORDER BY created_at DESC, id DESC LIMIT 1",
+            ids,
+        ).fetchone()[0]
+        connection.execute(
+            f"UPDATE handoff_requests SET status = 'cancelled', updated_at = ?, resolved_at = ? "
+            f"WHERE id IN ({','.join('?' for _ in ids)}) AND id <> ?",
+            (now, now, *ids, keep),
+        )
+    indexes = (
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_handoffs_active_conversation ON handoff_requests(conversation_id) WHERE status IN ('requested', 'in_progress')",
+        "CREATE INDEX IF NOT EXISTS idx_conversations_workspace_created ON conversations(workspace_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_conversations_workspace_activity ON conversations(workspace_id, last_message_at DESC, updated_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_messages_workspace_created ON messages(workspace_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_generation_workspace_created ON generation_runs(workspace_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_handoffs_workspace_queue ON handoff_requests(workspace_id, status, created_at, id)",
+    )
+    for statement in indexes:
+        connection.execute(statement)
+
+
 MIGRATIONS: tuple[tuple[int, str, Migration], ...] = (
     (1, "catalogue", _migration_001_catalogue),
     (2, "embedding_fingerprint", _migration_002_embedding_fingerprint),
@@ -309,6 +332,7 @@ MIGRATIONS: tuple[tuple[int, str, Migration], ...] = (
     (4, "conversations", _migration_004_conversations),
     (5, "message_parent", _migration_005_message_parent),
     (6, "workspace_catalogue_keys", _migration_006_workspace_catalogue_keys),
+    (7, "admin_operations", _migration_007_admin_operations),
 )
 
 
@@ -321,9 +345,7 @@ def run_migrations(connection: sqlite3.Connection) -> None:
             applied_at TEXT NOT NULL
         )"""
     )
-    applied = {
-        int(row[0]) for row in connection.execute("SELECT version FROM schema_migrations")
-    }
+    applied = {int(row[0]) for row in connection.execute("SELECT version FROM schema_migrations")}
     for version, name, migration in MIGRATIONS:
         if version in applied:
             continue

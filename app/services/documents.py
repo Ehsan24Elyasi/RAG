@@ -158,3 +158,14 @@ class DocumentService:
             raise
         self.vectors.delete(list(set(previous_ids) - set(vector_ids)))
         return IngestedDocument(document_id, source_name, source_type, source_url, len(chunks), False)
+
+    def delete_upload(self, workspace_id: str, document_id: str) -> bool:
+        candidate = self.metadata.document_deletion_candidate(workspace_id, document_id)
+        if candidate is None:
+            return False
+        if candidate.document.source_type != "upload":
+            raise ValueError("Only uploaded documents can be deleted.")
+        self.vectors.delete(candidate.vector_ids)
+        if not self.metadata.delete_document_metadata(workspace_id, document_id):
+            raise RuntimeError("Document metadata could not be deleted.")
+        return True

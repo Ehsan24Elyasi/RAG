@@ -8,7 +8,7 @@ The project runs as a single FastAPI application. The customer chat widget and a
 
 - Floating customer support chat widget
 - Persian and mixed RTL/LTR text support
-- Minimal admin dashboard at `/admin`
+- Operational admin dashboard with usage metrics, token totals, conversations, transcripts, human-support requests, and document management
 - Upload support for TXT, PDF, and JSON files
 - Bounded same-origin web crawler for public documentation pages
 - Local multilingual embeddings with SentenceTransformers
@@ -174,8 +174,11 @@ Open `.env` and configure it:
 ```env
 # Application
 APP_ENV=development
-ASSISTANT_NAME=Support Assistant
-COMPANY_NAME=Your Company
+ASSISTANT_NAME=پاسخ‌یار
+COMPANY_NAME=نام شرکت
+SUPPORT_EMAIL=
+SUPPORT_PHONE=
+SUPPORT_URL=
 DATA_DIR=app/data/runtime
 SQLITE_PATH=app/data/runtime/rag.sqlite3
 CHROMA_PERSIST_DIR=app/data/runtime/chroma
@@ -206,6 +209,11 @@ SERVER_CONVERSATIONS_ENABLED=true
 WIDGET_TOKEN_SECRET=replace-this-with-a-separate-high-entropy-secret
 WIDGET_TOKEN_AUDIENCE=rag-widget
 WIDGET_TOKEN_CLOCK_SKEW_SECONDS=30
+# Loopback development/test only; production rejects this mode.
+LOCAL_DEMO_WIDGET_ENABLED=true
+LOCAL_DEMO_WIDGET_EXTERNAL_USER_ID=local-demo-user
+LOCAL_DEMO_WIDGET_DISPLAY_NAME=کاربر آزمایشی محلی
+LOCAL_DEMO_WIDGET_TOKEN_TTL_SECONDS=300
 
 # Optional direct browser origins
 # The bundled frontend is served by FastAPI and does not require CORS.
@@ -232,16 +240,23 @@ ADMIN_API_KEY=replace-this-with-a-long-random-secret
 
 `CHAT_API_KEY` is sent only by the backend to GapGPT.
 
-`ASSISTANT_NAME` and `COMPANY_NAME` control the public chat branding and the assistant identity used in responses. For example:
+`ASSISTANT_NAME` and `COMPANY_NAME` control the public chat branding and the assistant identity used in responses. `SUPPORT_EMAIL`, `SUPPORT_PHONE`, and `SUPPORT_URL` are optional public channels used by the widget and by grounded fallback responses. Leave an unavailable channel empty; the assistant never invents a replacement.
 
 ```env
-ASSISTANT_NAME=Jibi Assistant
-COMPANY_NAME=Jibi
+ASSISTANT_NAME=پاسخ‌یار
+COMPANY_NAME=فروشگاه نمونه
+SUPPORT_EMAIL=
+SUPPORT_PHONE=
+SUPPORT_URL=https://example.com/support
 ```
+
+The assistant policy keeps responses in natural Iranian Persian, introduces the configured identity only on the first assistant turn, remains within the company's support scope, treats retrieved text and conversation messages as untrusted data, and requires source labels for company-specific factual claims.
 
 `RETRIEVAL_MAX_DISTANCE` controls the maximum accepted cosine distance for retrieved chunks. Lower values are stricter. The default `0.65` is a starting point and should be evaluated against your own documentation.
 
 `WIDGET_TOKEN_SECRET` is used by the host website to sign short-lived HS256 widget tokens. Each token must contain `workspace_id`, `external_user_id`, `aud`, `iat`, and `exp`. Never expose this signing secret to browser JavaScript. Server-side conversations are enabled by `SERVER_CONVERSATIONS_ENABLED` and require this secret in production.
+
+When the bundled page is opened directly on `127.0.0.1`, `localhost`, or `::1` in development/test, the same-origin `POST /api/dev/widget-bootstrap` endpoint can issue a short-lived token for the fixed server-configured local demo identity. This makes local messages, token usage, transcripts, and human-support requests visible in `/admin`. The endpoint accepts no browser-selected workspace or user, returns `Cache-Control: no-store`, and is unavailable in production. Do not use this mode for LAN demos, shared staging environments, or public previews.
 
 `ADMIN_API_KEY` is the password used to unlock the admin dashboard. For example:
 
@@ -595,10 +610,11 @@ The crawler intentionally applies restrictions:
 - Only absolute HTTP and HTTPS URLs are accepted.
 - Only default HTTP/HTTPS ports are accepted.
 - Localhost, private, link-local, and reserved IP addresses are rejected.
-- Only same-origin links are followed.
+- Redirects are followed manually with a five-hop limit; every target is validated before it is requested.
+- After the validated start redirect, only same-origin links are followed.
 - Response size, page count, depth, and timeout are limited.
-- Non-HTML resources are ignored.
-- Script, style, navigation, header, and footer content is removed.
+- HTML and XHTML pages are accepted; other resources are rejected with an actionable error for the start page.
+- Navigation links are discovered before script, style, navigation, header, and footer text is removed from extracted content.
 
 Do not use the crawler for private dashboards, authenticated sites, intranet hosts, or internal cloud metadata endpoints.
 
@@ -749,6 +765,7 @@ docker compose down -v
 | `GET` | `/` | Customer page and chat widget |
 | `GET` | `/healthz` | Service health check |
 | `POST` | `/api/chat` | Legacy stateless RAG chat request |
+| `POST` | `/api/dev/widget-bootstrap` | Loopback-only development/test token bootstrap |
 
 ### Authenticated widget conversation endpoints
 
@@ -789,8 +806,9 @@ await window.RagSupportWidget.setToken(refreshedSignedWidgetToken);
 
 Available host methods are `init({ token, open })`, `setToken(token)`, `open()`, `close()`, and `reset()`.
 
-- With a token, the widget uses the authenticated server conversation endpoints and stable message IDs.
-- Without a token, it intentionally uses the legacy `/api/chat` endpoint and bounded browser history.
+- A host-provided token always has priority and uses the authenticated server conversation endpoints with stable message IDs.
+- On the bundled loopback page in development/test, the widget automatically requests a local demo token when no host token exists. It renews that token in memory and preserves the same server-controlled identity.
+- If local bootstrap is disabled or unavailable, a page without a token uses the legacy `/api/chat` endpoint and bounded browser history; those calls are not included in authenticated admin metrics.
 - Tokens are kept only in JavaScript memory. They are not written to local storage, session storage, URLs, or the DOM.
 - The browser caches a bounded visible transcript and the active conversation ID. The current API does not expose transcript retrieval, so clearing browser storage removes the local display even though authenticated messages may remain in SQLite.
 - The reset control starts a fresh local conversation. It does not delete an existing server-side conversation.
@@ -809,7 +827,13 @@ Authorization: Bearer YOUR_ADMIN_API_KEY
 |---|---|---|
 | `GET` | `/admin` | Admin dashboard |
 | `GET` | `/api/admin/status` | Service and ingestion status |
+| `GET` | `/api/admin/metrics` | Period, current, and lifetime usage metrics |
+| `GET` | `/api/admin/conversations` | List persisted customer conversations |
+| `GET` | `/api/admin/conversations/{id}` | Read an authorized transcript and generation details |
+| `GET` | `/api/admin/handoffs` | List human-support requests |
+| `PATCH` | `/api/admin/handoffs/{id}` | Update a support-request state |
 | `GET` | `/api/admin/documents` | List indexed documents |
+| `DELETE` | `/api/admin/documents/{id}` | Delete an uploaded document and its vectors |
 | `POST` | `/api/admin/upload` | Upload and index one document |
 | `POST` | `/api/admin/crawl` | Crawl and index public pages |
 
@@ -942,11 +966,13 @@ Use the reset button inside the chat widget, or clear the site's local storage i
 
 ## Current Limitations
 
-- External users are identified through host-signed widget tokens; there is no first-party login UI or full role-based access-control system.
+- Production users are identified through host-signed widget tokens; the fixed local demo identity exists only for same-origin loopback development/test. There is no first-party login UI or full role-based access-control system.
 - Conversations and messages are persisted, but there is no public transcript retrieval endpoint or conversation-history selector in the widget yet.
 - No background job queue or scheduled crawler synchronization.
-- No ticketing, human handoff, feedback, or report API/UI yet.
-- No streaming chat responses or explicit generation cancellation yet.
+- Human-support requests are an internal review queue, not live chat. The widget states this before submission; there is no operator reply channel, assignment system, or customer notification yet.
+- Admin period metrics cover persisted authenticated conversations only. Legacy `/api/chat` calls are excluded. Token cards show provider-reported usage, identify successful generations with missing usage, and separate the selected period from the lifetime total.
+- No feedback/report UI, streaming chat responses, or explicit generation cancellation yet.
+- DNS targets are screened before each crawler request, but the validated IP is not yet pinned to the HTTP connection; stronger DNS-rebinding protection remains a hardening task.
 - Workspace-aware conversation identity exists, but document administration and retrieval still target the initial single-server deployment model.
 - No distributed ingestion lock; local ChromaDB is intended for one application instance.
 

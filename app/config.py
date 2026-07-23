@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
@@ -25,6 +26,9 @@ class Settings(BaseSettings):
         default="پاسخ‌یار", validation_alias="ASSISTANT_NAME", min_length=1, max_length=100
     )
     company_name: str = Field(default="باسلام", validation_alias="COMPANY_NAME", min_length=1, max_length=100)
+    support_email: str | None = Field(default=None, validation_alias="SUPPORT_EMAIL", max_length=254)
+    support_phone: str | None = Field(default=None, validation_alias="SUPPORT_PHONE", max_length=32)
+    support_url: str | None = Field(default=None, validation_alias="SUPPORT_URL", max_length=2048)
     environment: Literal["development", "test", "production"] = Field(
         default="development", validation_alias=AliasChoices("APP_ENV", "ENVIRONMENT")
     )
@@ -62,15 +66,34 @@ class Settings(BaseSettings):
     admin_api_key: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("ADMIN_API_KEY", "ADMIN_TOKEN")
     )
-    server_conversations_enabled: bool = Field(
-        default=True, validation_alias="SERVER_CONVERSATIONS_ENABLED"
-    )
+    server_conversations_enabled: bool = Field(default=True, validation_alias="SERVER_CONVERSATIONS_ENABLED")
     widget_token_secret: SecretStr | None = Field(default=None, validation_alias="WIDGET_TOKEN_SECRET")
     widget_token_audience: str = Field(
         default="rag-widget", validation_alias="WIDGET_TOKEN_AUDIENCE", min_length=1, max_length=100
     )
     widget_token_clock_skew_seconds: int = Field(
         default=30, validation_alias="WIDGET_TOKEN_CLOCK_SKEW_SECONDS", ge=0, le=300
+    )
+    local_demo_widget_enabled: bool | None = Field(
+        default=None, validation_alias="LOCAL_DEMO_WIDGET_ENABLED"
+    )
+    local_demo_widget_external_user_id: str = Field(
+        default="local-demo-user",
+        validation_alias="LOCAL_DEMO_WIDGET_EXTERNAL_USER_ID",
+        min_length=1,
+        max_length=200,
+    )
+    local_demo_widget_display_name: str = Field(
+        default="کاربر آزمایشی محلی",
+        validation_alias="LOCAL_DEMO_WIDGET_DISPLAY_NAME",
+        min_length=1,
+        max_length=200,
+    )
+    local_demo_widget_token_ttl_seconds: int = Field(
+        default=300,
+        validation_alias="LOCAL_DEMO_WIDGET_TOKEN_TTL_SECONDS",
+        ge=60,
+        le=900,
     )
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=list, validation_alias=AliasChoices("CORS_ALLOWED_ORIGINS", "CORS_ORIGINS")
@@ -117,6 +140,67 @@ class Settings(BaseSettings):
     )
     crawl_timeout_seconds: float = Field(default=15.0, validation_alias="CRAWL_TIMEOUT_SECONDS", gt=0, le=60)
 
+    @field_validator(
+        "assistant_name",
+        "company_name",
+        "local_demo_widget_external_user_id",
+        "local_demo_widget_display_name",
+    )
+    @classmethod
+    def validate_brand_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value or any(ord(character) < 32 for character in value):
+            raise ValueError("public identity values must not contain control characters")
+        return value
+
+    @field_validator("support_email", "support_phone", "support_url", mode="before")
+    @classmethod
+    def normalize_optional_contact(cls, value: object) -> object:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+    @field_validator("support_email")
+    @classmethod
+    def validate_support_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if any(ord(character) < 32 for character in value):
+            raise ValueError("support email must not contain control characters")
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
+            raise ValueError("support email must be a single valid address")
+        return value
+
+    @field_validator("support_phone")
+    @classmethod
+    def validate_support_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if any(ord(character) < 32 for character in value):
+            raise ValueError("support phone must not contain control characters")
+        if not re.fullmatch(r"\+?[0-9۰-۹٠-٩ ()-]+", value) or not any(
+            character.isdigit() for character in value
+        ):
+            raise ValueError("support phone contains unsupported characters")
+        return value
+
+    @field_validator("support_url")
+    @classmethod
+    def validate_support_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if any(ord(character) < 32 for character in value):
+            raise ValueError("support URL must not contain control characters")
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("support URL must be an absolute http(s) URL")
+        if parsed.username or parsed.password:
+            raise ValueError("support URL must not contain credentials")
+        return value
+
     @field_validator("chat_provider")
     @classmethod
     def normalize_provider(cls, value: str) -> str:
@@ -149,6 +233,12 @@ class Settings(BaseSettings):
             and not self.widget_token_secret
         ):
             raise ValueError("WIDGET_TOKEN_SECRET is required when server conversations are enabled")
+        if self.environment == "production" and self.local_demo_widget_enabled is True:
+            raise ValueError("LOCAL_DEMO_WIDGET_ENABLED must not be enabled in production")
+        if self.local_demo_widget_enabled is True and not self.server_conversations_enabled:
+            raise ValueError("LOCAL_DEMO_WIDGET_ENABLED requires SERVER_CONVERSATIONS_ENABLED")
+        if self.local_demo_widget_enabled is True and not self.widget_token_secret:
+            raise ValueError("LOCAL_DEMO_WIDGET_ENABLED requires WIDGET_TOKEN_SECRET")
         if self.chat_provider not in {"openai", "ollama"} and not self.chat_base_url:
             raise ValueError("CHAT_BASE_URL is required for custom providers")
         return self
@@ -171,6 +261,15 @@ class Settings(BaseSettings):
                 raise ValueError("origins must not contain credentials or a path")
             origins.append(f"{parsed.scheme.lower()}://{parsed.netloc.lower()}")
         return list(dict.fromkeys(origins))
+
+    @property
+    def local_demo_widget_available(self) -> bool:
+        return bool(
+            self.environment in {"development", "test"}
+            and self.local_demo_widget_enabled is not False
+            and self.server_conversations_enabled
+            and self.widget_token_secret
+        )
 
     def provider_base_url(self, kind: Literal["chat"]) -> str | None:
         if self.chat_base_url:

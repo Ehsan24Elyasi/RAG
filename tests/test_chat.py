@@ -115,3 +115,33 @@ def test_persian_social_messages_are_deterministic_without_retrieval(test_settin
     assert sources == []
     assert embeddings.calls == []
     assert chat.messages == []
+
+
+def test_later_greeting_does_not_repeat_assistant_introduction(test_settings):
+    service, _, _ = _service(test_settings)
+    result = service.answer_detailed(
+        "سلام",
+        [{"role": "assistant", "content": "پاسخ قبلی"}],
+        top_k=1,
+    )
+
+    assert test_settings.assistant_name not in result.answer
+    assert result.generation is None
+
+
+def test_unknown_response_uses_only_configured_contacts(test_settings):
+    settings = test_settings.model_copy(
+        update={"support_email": "help@example.test", "support_phone": None, "support_url": None}
+    )
+    service, _, _ = _service(settings)
+    service.vectors = type(
+        "EmptyVectorStore",
+        (),
+        {"query": lambda self, query_embedding, top_k: {"ids": [[]], "documents": [[]]}},
+    )()
+
+    result = service.answer_detailed("سؤال بدون پاسخ", [], top_k=1)
+
+    assert "help@example.test" in result.answer
+    assert "پایگاه دانش" not in result.answer
+    assert result.generation is None

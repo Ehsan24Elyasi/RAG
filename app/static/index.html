@@ -12,9 +12,9 @@
 <body>
   <div class="site-shell">
     <header class="site-header">
-      <a class="brand" href="/" aria-label="صفحهٔ اصلی پاسخ‌یار">
-        <span class="brand-mark" aria-hidden="true">پ</span>
-        <span>پاسخ‌یار<small>پشتیبانی هوشمند</small></span>
+      <a class="brand" href="/" id="site-brand" aria-label="صفحهٔ اصلی پاسخ‌یار">
+        <span class="brand-mark" data-brand-mark aria-hidden="true">پ</span>
+        <span><span id="site-brand-name">پاسخ‌یار</span><small id="site-brand-company">پشتیبانی هوشمند</small></span>
       </a>
       <a class="header-link" href="/admin">مدیریت دانش‌نامه</a>
     </header>
@@ -24,7 +24,7 @@
         <div class="hero-content">
           <p class="eyebrow"><span aria-hidden="true"></span>همیشه در دسترس شما</p>
           <h1 id="hero-title">پاسخ پرسش‌هایتان، <strong>سریع و مستند</strong></h1>
-          <p class="hero-text">پاسخ‌یار در منابع معتبر جست‌وجو می‌کند تا پاسخ موردنیازتان را شفاف، روان و همراه با منبع پیدا کنید.</p>
+          <p class="hero-text"><span id="hero-assistant-name">پاسخ‌یار</span> پاسخ پرسش‌های پشتیبانی را شفاف، روان و همراه با منبع ارائه می‌کند.</p>
           <div class="hero-actions">
             <button class="button button-primary" type="button" id="hero-chat-button">
               گفت‌وگو را شروع کنید
@@ -41,7 +41,7 @@
         <div class="hero-visual" aria-hidden="true">
           <div class="hero-orb"></div>
           <div class="ask-card">
-            <div class="ask-card-header"><span class="ask-card-avatar">پ</span>پاسخ‌یار <span class="online-dot"></span></div>
+            <div class="ask-card-header"><span class="ask-card-avatar" data-brand-mark>پ</span><span id="sample-assistant-name">پاسخ‌یار</span><span class="online-dot"></span></div>
             <p class="sample-question">شرایط ارسال سفارش چیست؟</p>
             <div class="sample-answer">جزئیات شرایط ارسال در صفحهٔ راهنمای سفارش‌ها آمده است.<div class="sample-line"></div><div class="sample-line short"></div></div>
             <div class="sample-source">منبع: راهنمای سفارش‌ها</div>
@@ -56,7 +56,7 @@
         <div class="section-heading">
           <p class="eyebrow">ساده، شفاف و قابل بررسی</p>
           <h2 id="features-title">کمک گرفتن، بدون پیچیدگی</h2>
-          <p>سؤال خود را به زبان طبیعی بنویسید؛ پاسخ‌یار در اسناد و صفحات ثبت‌شده به دنبال پاسخ می‌گردد.</p>
+          <p>سؤال خود را به زبان طبیعی بنویسید؛ <span id="features-assistant-name">پاسخ‌یار</span> پاسخ مرتبط را همراه با منبع ارائه می‌کند.</p>
         </div>
         <div class="feature-grid">
           <article class="feature-card">
@@ -74,7 +74,7 @@
         </div>
       </div>
     </section>
-    <footer class="site-footer">پاسخ‌یار · برای پاسخ‌گویی بهتر در کنار شما</footer>
+    <footer class="site-footer"><span id="footer-assistant-name">پاسخ‌یار</span> · برای پاسخ‌گویی بهتر در کنار شما</footer>
   </div>
 
   <button class="chat-launcher" id="chat-launcher" type="button" aria-label="باز کردن گفت‌وگوی پشتیبانی" aria-expanded="false" aria-controls="chat-panel">
@@ -85,7 +85,7 @@
   <section class="chat-panel" id="chat-panel" role="dialog" aria-modal="true" aria-labelledby="chat-title" aria-hidden="true">
     <header class="chat-topbar">
       <div class="chat-agent">
-        <span class="chat-agent-mark" aria-hidden="true">پ<span></span></span>
+        <span class="chat-agent-mark" aria-hidden="true"><b data-brand-mark>پ</b><span></span></span>
         <span><strong id="chat-title">پاسخ‌یار</strong><small>پاسخ بر پایهٔ منابع معتبر</small></span>
       </div>
       <button class="button button-quiet" id="chat-reset" type="button" title="شروع گفت‌وگوی تازه" aria-label="شروع گفت‌وگوی تازه">
@@ -112,6 +112,20 @@
           </button>
         </div>
         <div class="chat-hint"><span>Enter برای ارسال · Shift+Enter برای خط جدید</span><span id="char-count">۰/۲۰٬۰۰۰</span></div>
+        <section class="chat-support" id="chat-support" aria-labelledby="chat-support-title" hidden>
+          <div class="chat-support-summary">
+            <div><strong id="chat-support-title">نیاز به بررسی پشتیبانی دارید؟</strong><small>درخواست در صف بررسی ثبت می‌شود و گفت‌وگوی زنده نیست.</small></div>
+            <button class="button button-secondary chat-handoff" id="chat-handoff" type="button" aria-expanded="false" aria-controls="handoff-form">ثبت درخواست</button>
+          </div>
+          <div class="handoff-form" id="handoff-form" hidden>
+            <label for="handoff-reason">دلیل درخواست <span>(اختیاری)</span></label>
+            <textarea id="handoff-reason" rows="2" maxlength="1000" placeholder="موضوعی که نیاز به بررسی کارشناس دارد…"></textarea>
+            <div class="handoff-form-meta"><span id="handoff-reason-count">۰/۱٬۰۰۰</span><span>ارسال این فرم به معنی شروع گفت‌وگوی زنده نیست.</span></div>
+            <div class="handoff-form-actions"><button class="button button-primary" id="handoff-submit" type="button">ثبت در صف پشتیبانی</button><button class="button button-quiet" id="handoff-cancel" type="button">انصراف</button></div>
+          </div>
+          <p class="handoff-status" id="handoff-status" role="status" aria-live="polite" hidden></p>
+          <div class="support-contacts" id="support-contacts" hidden></div>
+        </section>
       </form>
     </div>
   </section>
